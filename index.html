@@ -3,340 +3,1146 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <title>IPLUS Player — HLS + DASH + ปรับขนาด</title>
-  <link href="https://fonts.googleapis.com/css2?family=Prompt:wght@300;400;600&display=swap" rel="stylesheet">
-  
-  <!-- 🔥 ไลบรารี HLS + DASH -->
+  <title>Fullscreen Video — HLS + DASH Player</title>
+
+  <!-- 🔥 นำเข้าไลบรารี HLS และ DASH -->
   <script src="https://cdn.jsdelivr.net/npm/hls.js@1.5.21/dist/hls.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/dashjs@4.7.4/dist/dash.all.min.js"></script>
-  
   <style>
-    * { box-sizing: border-box; margin: 0; padding: 0; }
-    html, body {
-      background: #0f172a;
-      font-family: 'Prompt', sans-serif;
-      color: #f8fafc;
-      min-height: 100vh;
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      background: #121212;
+      color: #eee;
+      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
     }
-    .page-wrap {
+
+    header {
+      background-color: #111;
+      padding: 12px 24px;
       display: flex;
-      flex-direction: column;
       align-items: center;
-      padding: 20px;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.7);
+      gap: 16px;
     }
-    h1 {
-      text-align: center;
-      margin-bottom: 15px;
-      font-size: 22px;
-      color: #4ade80;
-    }
-    .status-bar {
-      width: 100%;
-      max-width: 900px;
-      padding: 12px 16px;
-      background: #1e293b;
-      border-radius: 10px;
-      margin-bottom: 10px;
-      font-size: 14px;
-      color: #93c5fd;
-      min-height: 44px;
-      border-left: 4px solid #3b82f6;
-    }
-    .hint-box {
-      width: 100%;
-      max-width: 900px;
-      padding: 10px 14px;
-      background: rgba(251, 191, 36, 0.08);
-      border: 1px solid #f59e0b;
-      border-radius: 8px;
-      margin-bottom: 10px;
-      font-size: 13px;
-      color: #fcd34d;
-      line-height: 1.5;
-    }
-    .video-wrapper {
-      width: 100%;
-      max-width: 900px;
-      background: #000;
-      border-radius: 12px;
+
+    .running-text-container {
+      flex: 1;
       overflow: hidden;
-      border: 4px solid #e2e8f0;
-      margin-bottom: 10px;
+      white-space: nowrap;
       position: relative;
-      box-shadow: 0 4px 20px rgba(0,0,0,0.5);
+      height: 48px;
     }
-    video {
+    .running-text {
+      display: inline-block;
+      padding-left: 100%;
+      animation: marquee 15s linear infinite;
+      font-size: 20px;
+      font-weight: 600;
+      color: #fff;
+      line-height: 48px;
+    }
+    @keyframes marquee {
+      0% { transform: translateX(0); }
+      100% { transform: translateX(-100%); }
+    }
+
+    #videoContainer {
       width: 100%;
-      height: auto;
+      max-width: 900px;
+      margin: 20px auto;
+      background: #000;
+      padding: 10px;
+      border-radius: 8px;
+    }
+    #videoPlayer {
+      width: 100%;
       aspect-ratio: 16/9;
       background: #000;
-      display: block;
-      transition: all 0.3s ease;
     }
-    /* 🎯 โหมดปรับขนาดวิดีโอ */
-    video.mode-contain { object-fit: contain; }  /* เต็มจอไม่ตัดภาพ มีขอบดำ */
-    video.mode-cover  { object-fit: cover; }     /* เต็มจอ ไม่มีขอบ ตัดภาพ */
-    video.mode-fill   { object-fit: fill; }      /* ขยายเต็มจอ อาจผิดสัดส่วน */
-    video.mode-16-9   { object-fit: contain; aspect-ratio: 16/9; height: auto; }
-    video.mode-4-3    { object-fit: contain; aspect-ratio: 4/3; height: auto; }
-
-    /* 🎛️ ปุ่มควบคุมขนาด */
-    .size-controls {
+    .status-bar {
+      padding: 8px 10px;
+      font-size: 13px;
+      color: #90caf9;
+      min-height: 32px;
+    }
+    .input-area {
+      margin: 10px 0;
+      display: flex;
+      gap: 8px;
+    }
+    .input-area input {
+      flex: 1;
+      padding: 8px;
+      font-size: 14px;
+      border-radius: 4px;
+      border: none;
+    }
+    .controls {
       display: flex;
       flex-wrap: wrap;
       gap: 8px;
-      justify-content: center;
-      margin-bottom: 15px;
-      width: 100%;
-      max-width: 900px;
+      margin-top: 10px;
     }
-    .size-btn {
-      background: #1e293b;
-      color: #fff;
-      padding: 8px 12px;
-      border-radius: 8px;
-      border: 2px solid #475569;
+    .button {
       cursor: pointer;
-      font-family: 'Prompt', sans-serif;
-      font-size: 13px;
-      transition: all 0.2s;
+      padding: 8px 14px;
+      border: none;
+      background: #0f62fe;
+      color: #fff;
+      border-radius: 5px;
+      transition: background 0.2s;
     }
-    .size-btn:hover, .size-btn.active {
-      background: #334155;
-      border-color: #4ade80;
-      color: #4ade80;
-    }
+    .button:hover { background: #005fcc; }
 
-    .categories, .channels {
+    /* === ส่วนหมวดหมู่ === */
+    .category-tab {
+      max-width: 900px;
+      margin: 0 auto;
       display: flex;
       flex-wrap: wrap;
-      justify-content: center;
-      gap: 10px;
+      gap: 8px;
+      padding: 10px;
+    }
+    .category-btn {
+      padding: 6px 14px;
+      border-radius: 20px;
+      border: 1px solid #444;
+      background: #222;
+      color: #ccc;
+      cursor: pointer;
+      transition: all 0.25s;
+    }
+    .category-btn:hover,
+    .category-btn.active {
+      background: #0f62fe;
+      color: #fff;
+      border-color: #0f62fe;
+    }
+
+    /* === รายการช่อง === */
+    #channelList {
       width: 100%;
       max-width: 900px;
+      margin: 0 auto 40px;
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+      gap: 12px;
+      padding: 10px;
     }
-    .channel-button {
-      background: #1e293b;
-      color: #fff;
-      padding: 10px 12px;
-      border-radius: 10px;
-      border: 2px solid #475569;
+    .channel-item {
       cursor: pointer;
-      text-align: center;
-      width: 130px;
-      font-family: 'Prompt', sans-serif;
-      outline: none;
-      transition: all 0.2s;
+      background: #222;
+      border-radius: 8px;
+      padding: 10px;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      transition: all 0.25s ease;
     }
-    .channel-button:hover,
-    .channel-button:focus {
-      background: #334155;
-      border-color: #4ade80;
-      transform: translateY(-2px);
+    .channel-item:hover,
+    .channel-item.active {
+      background-color: #0f62fe;
+      transform: scale(1.03);
     }
-    .channel-button img {
-      width: 42px;
-      height: 42px;
+    .channel-item img {
+      width: 60px;
+      height: 36px;
       object-fit: contain;
-      border-radius: 6px;
-      margin-bottom: 6px;
-      background: #fff;
+      border-radius: 4px;
     }
-    .back-btn {
-      background: #3b82f6;
-      border-color: #2563eb;
+    .channel-name {
+      font-size: 15px;
+      font-weight: 600;
+      color: #eee;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
     }
+
+    /* ซ่อนกลุ่มที่ไม่ได้เลือก */
+    .channel-group { display: contents; }
+    .channel-group.hidden { display: none; }
+
     @media (max-width: 600px) {
-      .channel-button { width: 110px; font-size: 12px; padding: 8px; }
-      .channel-button img { width: 36px; height: 36px; }
-      .size-btn { font-size: 12px; padding: 6px 10px; }
+      #channelList { grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); }
+      .channel-item img { width: 48px; height: 28px; }
+      .channel-name { font-size: 13px; }
     }
   </style>
 </head>
+    
 <body>
+  <header>
+    <h1> IPTV Player — HLS + DASH</h1>
+  </header>
 
-  <div class="page-wrap">
-    <h1>📺 IPTV Player — ปรับขนาดหน้าจอได้</h1>
+  <div id="videoContainer">
+    <video id="videoPlayer" controls></video>
+    <div class="status-bar" id="statusBar">พร้อมทำงาน</div>
 
-    <div class="hint-box">
-      ⚙️ เลือกโหมดแสดงภาพด้านล่าง: เต็มจอมีขอบ / เต็มจอไม่มีขอบ / ขยายเต็มจอ / อัตราส่วน 16:9 / 4:3
+    <div class="input-area">
+      <input type="text" id="videoInput" placeholder="📋 วางลิงก์ .m3u8 / .mpd / วิดีโอ แล้วกด ▶ เล่น" />
+      <button class="button" id="loadVideoBtn">▶ เล่น</button>
     </div>
-
-    <div class="status-bar" id="statusBar">พร้อมทำงาน — เลือกช่องและปรับขนาดภาพตามต้องการ</div>
-
-    <div class="video-wrapper">
-      <video id="video"  class="mode-contain" controls
-      source src="https://distributionsjustepourrire-justforlaughsgags-1-us.tcl.wurl.tv/playlist.m3u8" type="application/vnd.apple.mpegurl"></video>
-     
+    <div class="controls">
+      <button class="button" id="stretch">Stretch</button>
+      <button class="button" id="crop">Crop</button>
+      <button class="button" id="zoom">Zoom</button>
+      <button class="button" id="fullscreen">เต็มจอ</button>
     </div>
-
-    <!-- 🎛️ ปุ่มปรับขนาดภาพ -->
-    <div class="size-controls">
-      <button class="size-btn active" data-mode="contain">มีขอบ</button>
-      <button class="size-btn" data-mode="cover">ไม่มีขอบ</button>
-      <button class="size-btn" data-mode="fill">ขยายเต็ม</button>
-      <button class="size-btn" data-mode="16-9">16:9</button>
-      <button class="size-btn" data-mode="4-3">4:3</button>
-      <button class="size-btn" data-mode="full">⛶ เต็มจอ</button>
-    </div>
-
-    <div id="categories" class="categories"></div>
-    <div id="channels" class="channels"></div>
   </div>
 
+  <!-- แถบเลือกหมวดหมู่ -->
+  <div class="category-tab" id="categoryTab">
+    <button class="category-btn active" data-category="all">ทั้งหมด</button>
+  </div>
+
+  <!-- รายการช่อง แยกตามกลุ่ม -->
+  <div id="channelList"></div>
+
+
+// ==============================================
+// 📋 ข้อมูลเพลย์ลิสต์
+// ==============================================
+
+
 <script>
-// ==============================================
-// 📂 ข้อมูลช่อง
-// ==============================================
-const digitalTV = [
-  { name: 'The GAGS',  logo: 'https://cdn.imgchest.com/files/a46aa3aae303.png', stream: 'https://corsproxy.io/?https://distributionsjustepourrire-justforlaughsgags-1-us.tcl.wurl.tv/playlist.m3u8' },
-     { name: 'Thai Rath',   
-    logo: 'https://goodiptv.site/images/tv/wIvpTVufwuomyCez38RtU10ql6ReqIX20240418191057thairahttvhd.jpg', 
-    stream: 'https://udn-streamer1.cdn.3bbtv.com:8443/3bb/live/32/32.mpd' 
-  },
-       { name: 'Thai Rath2',   
-    logo: 'https://goodiptv.site/images/tv/wIvpTVufwuomyCez38RtU10ql6ReqIX20240418191057thairahttvhd.jpg', 
-    stream: 'http://45.144.166.242:1935/ThairathTV/t3_thairathtv/playlist.m3u8' 
-  },
-    { name: 'ช่อง8',    logo: 'https://gigatv.3bbtv.co.th/wp-content/themes/changwattana/assets/channel/27.png', stream: 'https://udn-streamer1.cdn.3bbtv.com:8443/3bb/live/27/27.mpd' },
-    { name: 'Thai PBS',    logo: 'https://gigatv.3bbtv.co.th/wp-content/themes/changwattana/assets/channel/23.png', stream: 'https://udn-streamer1.cdn.3bbtv.com:8443/3bb/live/23/23.mpd' },
-      { name: 'AmarinTV HD.th',    logo: 'https://gigatv.3bbtv.co.th/wp-content/themes/changwattana/assets/channel/34.png', stream: 'https://udn-streamer1.cdn.3bbtv.com:8443/3bb/live/34/34.mpd' },
-        { name: 'Thai PBS',    logo: 'https://gigatv.3bbtv.co.th/wp-content/themes/changwattana/assets/channel/27.png', stream: 'https://udn-streamer1.cdn.3bbtv.com:8443/3bb/live/27/27.mpd' },
-          { name: 'Thai PBS',    logo: 'https://gigatv.3bbtv.co.th/wp-content/themes/changwattana/assets/channel/27.png', stream: 'https://udn-streamer1.cdn.3bbtv.com:8443/3bb/live/27/27.mpd' },
-  { name: '🔴Live Thai Rath', logo: 'https://goodiptv.site/images/tv/wIvpTVufwuomyCez38RtU10ql6ReqIX20240418191057thairahttvhd.jpg', stream: 'https://manifest.googlevideo.com/api/manifest/hls_variant/file/index.m3u8?expire=1786906612&ei=lLOBaoLFLs_BssUPqPHFYA&ip=223.24.139.85&id=O2QAjyUgnmA.1&source=yt_live_broadcast&requiressl=yes&xpc=EgVo2aDSNQ%3D%3D&hfr=1&maxh=4320&playlist_duration=30&manifest_duration=30&maudio=1&siu=1&bui=AR3QkAkfont_pqYYWE7u8hXShZWyFFyvMD3Yjl4BRW5k89xkjltWgUvTnmFYo_gTVLIylycI8g&spc=KBGBcpxUjFhOGMuFzUhh3tZrDkvfhhFnGUoghsALEji1pbSz6m2i5_G97B09ryeksREGFRYiD58&vprv=1&go=1&ns=CXOOHn207f_T3FHKox-hpXoX&rqh=5&reg=0&pacing=0&nvgoi=1&ncsapi=1&keepalive=yes&fexp=51565116%2C51946838%2C51973818%2C52089683&dover=11&n=iTnAYqP-FvzSZw&itag=0&playlist_type=DVR&sparams=expire%2Cei%2Cip%2Cid%2Csource%2Crequiressl%2Cxpc%2Chfr%2Cmaxh%2Cplaylist_duration%2Cmanifest_duration%2Cmaudio%2Csiu%2Cbui%2Cspc%2Cvprv%2Cgo%2Cns%2Crqh%2Creg%2Citag%2Cplaylist_type&sig=AE0s2JYwRQIhANCqzFvrILIpqzFkXULgPyODz6B5uFTN5ymiSsqQ3g2MAiBiy65D3CMHwyHvLbl8mzElEjOFU-2b_BPp4VdXEQhZaw%3D%3D&cpn=DKYQeg0Zb8ReJDk7&ibw=3010000&c=MWEB&cver=2.20260813.02.00&ptk=youtube_single&oid=6tGFEVDsxneJqsVjifQvEA&ptchn=rFDdD-EE05N7gjwZho2wqw&pltype=contentlive'
-  },
-    { name: 'CH8',   logo: 'https://cdn.imgchest.com/files/a46aa3aae303.png', stream: 'https://udn-streamer1.cdn.3bbtv.com:8443/3bb/live/27/27.mpd' },
-  // ✅ เพิ่มช่องอื่นๆ และลิงก์ .mpd ได้ที่นี่ครับ
-  // { name: 'ตัวอย่าง DASH', logo: '...', stream: 'https://example.com/live/manifest.mpd' },
-];
-const documentary = [
-            { name: 'Animal',   logo: 'https://i.postimg.cc/rFscPFcF/IMG-2948.png', stream: 'http://49.0.64.96:8007/Animal' },
-        { name: 'สำรวจโลก',   logo: 'https://cdn.imgchest.com/files/5944e14c1b6f.webp', stream: 'https://cdn2.stream.atmflix.live/atmflixlive/samrujlok/playlist.m3u8' },
-  // ✅ เพิ่มช่องอื่นๆ และลิงก์ .mpd ได้ที่นี่ครับ
-  // { name: 'ตัวอย่าง DASH', logo: '...', stream: 'https://example.com/live/manifest.mpd' },
-];
-const entertainment = [];
+  const m3uData = `
+#EXTM3U
 
-const categories = [
-  { name: '📺 ทีวีดิจิทัล', channels: digitalTV },
-  { name: '📖 สารคดี', channels: documentary },
-  { name: '🎉 บันเทิง', channels: entertainment },
-];
+#EXTINF:-1 tvg-chno="2" group-title="🇹🇭 ไทย" tvg-logo="https://madoball.com/upload/7161.jpg",🟣 7 HD
+https://hls.iptv-th.workers.dev/live/4011/playlist.m3u8
+https://godlivetv.io/madoball/7161/playlist.m3u8
+#EXTINF:-1 tvg-chno="3" group-title="🇹🇭 ไทย" tvg-logo="https://madoball.com/upload/6328.jpg",🟢 Amarin TV
+https://hls.iptv-th.workers.dev/live/4011/playlist.m3u8
+https://godlivetv.io/madoball/6328/playlist.m3u8
+#EXTINF:-1 tvg-chno="5" group-title="🇹🇭 ไทย" tvg-logo="https://madoball.com/upload/497.jpg",🔴 CH 8
+https://hls.iptv-th.workers.dev/live/4011/playlist.m3u8
+https://godlivetv.io/madoball/497/playlist.m3u8
+#EXTINF:-1 tvg-chno="6" group-title="🇹🇭 ไทย" tvg-logo="https://madoball.com/upload/6332.jpg",🔵 MCOT HD
+https://hls.iptv-th.workers.dev/live/4011/playlist.m3u8
+https://godlivetv.io/madoball/6332/playlist.m3u8
+#EXTINF:-1 tvg-chno="7" group-title="🇹🇭 ไทย" tvg-logo="https://madoball.com/upload/6339.jpg",🟠 Nation
+https://hls.iptv-th.workers.dev/live/4011/playlist.m3u8
+https://godlivetv.io/madoball/6339/playlist.m3u8
+#EXTINF:-1 tvg-chno="8" group-title="🇹🇭 ไทย" tvg-logo="https://madoball.com/upload/1450.jpg",🟡 NBT Channel
+https://hls.iptv-th.workers.dev/live/4011/playlist.m3u8
+https://godlivetv.io/madoball/1450/playlist.m3u8
+#EXTINF:-1 tvg-chno="9" group-title="🇹🇭 ไทย" tvg-logo="https://madoball.com/upload/1664.jpg",🟣 PPTV HD
+https://hls.iptv-th.workers.dev/live/4011/playlist.m3u8
+https://godlivetv.io/madoball/1664/playlist.m3u8
+#EXTINF:-1 tvg-chno="11" group-title="🇹🇭 ไทย" tvg-logo="https://madoball.com/upload/1698.jpg",🟢 Thai PBS
+https://hls.iptv-th.workers.dev/live/4011/playlist.m3u8
+https://godlivetv.io/madoball/1698/playlist.m3u8
+#EXTINF:-1 tvg-chno="13" group-title="🇹🇭 ไทย" tvg-logo="https://madoball.com/upload/6345.jpg",🔴 TNN 16
+https://hls.iptv-th.workers.dev/live/4011/playlist.m3u8
+https://godlivetv.io/madoball/6345/playlist.m3u8
+#EXTINF:-1 tvg-chno="14" group-title="🇹🇭 ไทย" tvg-logo="https://madoball.com/upload/430.jpg",🔵 TPTV
+https://hls.iptv-th.workers.dev/live/4011/playlist.m3u8
+https://godlivetv.io/madoball/430/playlist.m3u8
+#EXTINF:-1 tvg-chno="18" group-title="🇹🇭 ไทย" tvg-logo="https://madoball.com/upload/6337.jpg",🟠 True4U
+https://hls.iptv-th.workers.dev/live/4011/playlist.m3u8
+https://godlivetv.io/madoball/6337/playlist.m3u8
+#EXTINF:-1 tvg-chno="19" group-title="🇹🇭 ไทย" tvg-logo="https://madoball.com/upload/6335.jpg",🟡 Workpoint TV
+https://cri-streamer3.cdn.3bbtv.com:8443/3bb/live/23/23.mpd
+https://godlivetv.io/madoball/6335/playlist.m3u8
+#EXTINF:-1 tvg-chno="20" group-title="🇹🇭 ไทย" tvg-logo="https://madoball.com/upload/716.jpg",🟣 ของดีประเทศไทย
+https://hls.iptv-th.workers.dev/live/4011/playlist.m3u8
+https://godlivetv.io/madoball/716/playlist.m3u8
+#EXTINF:-1 tvg-chno="21" group-title="🇹🇭 ไทย" tvg-logo="https://madoball.com/upload/7348.jpg",🟢 ช่อง 3 HD
+https://hls.iptv-th.workers.dev/live/4011/playlist.m3u8
+https://godlivetv.io/madoball/7348/playlist.m3u8
+#EXTINF:-1 tvg-chno="22" group-title="🇹🇭 ไทย" tvg-logo="https://madoball.com/upload/7347.jpg",🔴 ช่อง 5 HD
+https://hls.iptv-th.workers.dev/live/4011/playlist.m3u8
+https://godlivetv.io/madoball/7347/playlist.m3u8
+#EXTINF:-1 tvg-chno="24" group-title="🇹🇭 ไทย" tvg-logo="https://madoball.com/upload/6330.jpg",🔵 ไทยรัฐ TV HD
+https://cco-streamer1.cdn.3bbtv.com:8443/3bb/live/32/32.mpd
+https://godlivetv.io/madoball/6330/playlist.m3u8
+#EXTINF:-1 tvg-chno="25" group-title="🇹🇭 ไทย" tvg-logo="https://madoball.com/upload/563.jpg",🟠 สำรวจโลก
+https://hls.iptv-th.workers.dev/live/4011/playlist.m3u8
+https://godlivetv.io/madoball/563/playlist.m3u8
+#EXTINF:-1 tvg-chno="26" group-title="🇹🇭 ไทย" tvg-logo="https://s3.dooflixlive.com/assets/images/tv/digital/amarin.png",🟡 อัมรินทร์
+https://cco-streamer1.cdn.3bbtv.com:8443/3bb/live/34/34.mpd
+#EXTINF:-1 tvg-chno="55" group-title="🇹🇭 ไทย" tvg-logo="https://madoball.com/upload/6336.jpg",🟣 GMM 25
+https://hls.iptv-th.workers.dev/live/4011/playlist.m3u8
+https://godlivetv.io/madoball/6336/playlist.m3u8
+#EXTINF:-1 tvg-chno="60" group-title="🇹🇭 ไทย" tvg-logo="https://madoball.com/upload/461.jpg",🟢 One Channel
+https://hls.iptv-th.workers.dev/live/4011/playlist.m3u8
+https://godlivetv.io/madoball/461/playlist.m3u8
+
+#EXTINF:-1 group-title="🇹🇭 ไทย" tvg-logo="https://cdn.imgchest.com/files/a46aa3aae303.png",Channel 8
+http://54c241893bf39.streamlock.net:1935/ch8/ch8/chunklist.m3u8
+
+#EXTINF:-1 group-title="🇹🇭 ไทย" tvg-logo="https://cdn.imgchest.com/files/a46aa3aae303.png",Channel 8
+http://vip.login.in.th:1935/ch8/ch8/playlist.m3u8
+# =============================================
+# 📰 หมวดหมู่: ข่าวสาร (News)
+# =============================================
+#EXTINF:-1 tvg-chno="27" group-title="📰 ข่าวสาร" tvg-logo="https://madoball.com/upload/6638.jpg",🔴 BBC World News
+https://hls.iptv-th.workers.dev/live/4011/playlist.m3u8
+https://godlivetv.io/madoball/6638/playlist.m3u8
+#EXTINF:-1 tvg-chno="28" group-title="📰 ข่าวสาร" tvg-logo="https://madoball.com/upload/2814.jpg",🔵 Bloomberg
+https://hls.iptv-th.workers.dev/live/4011/playlist.m3u8
+https://godlivetv.io/madoball/2814/playlist.m3u8
+#EXTINF:-1 tvg-chno="29" group-title="📰 ข่าวสาร" tvg-logo="https://madoball.com/upload/3026.jpg",🟠 CBS News
+https://hls.iptv-th.workers.dev/live/4011/playlist.m3u8
+https://godlivetv.io/madoball/3026/playlist.m3u8
+#EXTINF:-1 tvg-chno="30" group-title="📰 ข่าวสาร" tvg-logo="https://madoball.com/upload/2100.jpg",🟡 CGTN
+https://hls.iptv-th.workers.dev/live/4011/playlist.m3u8
+https://godlivetv.io/madoball/2100/playlist.m3u8
+#EXTINF:-1 tvg-chno="31" group-title="📰 ข่าวสาร" tvg-logo="https://madoball.com/upload/433.jpg",🟣 Channel NewsAsia
+https://hls.iptv-th.workers.dev/live/4011/playlist.m3u8
+https://godlivetv.io/madoball/433/playlist.m3u8
+#EXTINF:-1 tvg-chno="32" group-title="📰 ข่าวสาร" tvg-logo="https://madoball.com/upload/6639.jpg",🟢 CNN
+https://hls.iptv-th.workers.dev/live/4011/playlist.m3u8
+https://godlivetv.io/madoball/6639/playlist.m3u8
+#EXTINF:-1 tvg-chno="33" group-title="📰 ข่าวสาร" tvg-logo="https://madoball.com/upload/2145.jpg",🔴 DW News
+https://hls.iptv-th.workers.dev/live/4011/playlist.m3u8
+https://godlivetv.io/madoball/2145/playlist.m3u8
+#EXTINF:-1 tvg-chno="34" group-title="📰 ข่าวสาร" tvg-logo="https://madoball.com/upload/4337.jpg",🔵 Euronews
+https://hls.iptv-th.workers.dev/live/4011/playlist.m3u8
+https://godlivetv.io/madoball/4337/playlist.m3u8
+#EXTINF:-1 tvg-chno="35" group-title="📰 ข่าวสาร" tvg-logo="https://madoball.com/upload/7839.jpg",🟠 FOX Business
+https://hls.iptv-th.workers.dev/live/4011/playlist.m3u8
+https://godlivetv.io/madoball/7839/playlist.m3u8
+#EXTINF:-1 tvg-chno="36" group-title="📰 ข่าวสาร" tvg-logo="https://madoball.com/upload/9196.jpg",🟡 FOX NEWS
+https://hls.iptv-th.workers.dev/live/4011/playlist.m3u8
+https://godlivetv.io/madoball/9196/playlist.m3u8
+#EXTINF:-1 tvg-chno="37" group-title="📰 ข่าวสาร" tvg-logo="https://madoball.com/upload/394.jpg",🟣 France 24
+https://hls.iptv-th.workers.dev/live/4011/playlist.m3u8
+https://godlivetv.io/madoball/394/playlist.m3u8
+#EXTINF:-1 tvg-chno="38" group-title="📰 ข่าวสาร" tvg-logo="https://madoball.com/upload/408.jpg",🟢 NEWS1
+https://hls.iptv-th.workers.dev/live/4011/playlist.m3u8
+https://godlivetv.io/madoball/408/playlist.m3u8
+#EXTINF:-1 tvg-chno="39" group-title="📰 ข่าวสาร" tvg-logo="https://madoball.com/upload/1497.jpg",🔴 RT News
+https://hls.iptv-th.workers.dev/live/4011/playlist.m3u8
+https://godlivetv.io/madoball/1497/playlist.m3u8
+#EXTINF:-1 tvg-chno="40" group-title="📰 ข่าวสาร" tvg-logo="https://madoball.com/upload/1730.jpg",🔵 Top News
+https://hls.iptv-th.workers.dev/live/4011/playlist.m3u8
+https://godlivetv.io/madoball/1730/playlist.m3u8
+#EXTINF:-1 tvg-chno="41" group-title="📰 ข่าวสาร" tvg-logo="https://madoball.com/upload/1404.jpg",🟠 TV5MONDE
+https://hls.iptv-th.workers.dev/live/4011/playlist.m3u8
+https://godlivetv.io/madoball/1404/playlist.m3u8
+# =============================================
+# 🎬 หมวดหมู่: ภาพยนตร์ (Movies)
+# =============================================
+#EXTINF:-1 tvg-chno="1" group-title="🎬 ภาพยนตร์" tvg-logo="https://madoball.com/upload/2821.jpg",🔴 3BB Asian
+https://hls.iptv-th.workers.dev/live/4011/playlist.m3u8
+https://godlivetv.io/madoball/2821/playlist.m3u8
+#EXTINF:-1 tvg-chno="10" group-title="🎬 ภาพยนตร์" tvg-logo="https://madoball.com/upload/1642.jpg",🔵 Rama Channel
+https://hls.iptv-th.workers.dev/live/4011/playlist.m3u8
+https://godlivetv.io/madoball/1642/playlist.m3u8
+#EXTINF:-1 tvg-chno="17" group-title="🎬 ภาพยนตร์" tvg-logo="https://madoball.com/upload/1873.jpg",🟠 True Asian More
+https://hls.iptv-th.workers.dev/live/4011/playlist.m3u8
+https://godlivetv.io/madoball/1873/playlist.m3u8
+#EXTINF:-1 tvg-chno="42" group-title="🎬 ภาพยนตร์" tvg-logo="https://madoball.com/upload/1913.jpg",🟡 Celestial Classic Movies
+https://hls.iptv-th.workers.dev/live/4011/playlist.m3u8
+https://godlivetv.io/madoball/1913/playlist.m3u8
+#EXTINF:-1 tvg-chno="43" group-title="🎬 ภาพยนตร์" tvg-logo="https://madoball.com/upload/2815.jpg",🟣 CINEMAX
+https://hls.iptv-th.workers.dev/live/4011/playlist.m3u8
+https://godlivetv.io/madoball/2815/playlist.m3u8
+#EXTINF:-1 tvg-chno="44" group-title="🎬 ภาพยนตร์" tvg-logo="https://madoball.com/upload/2820.jpg",🟢 HBO
+https://hls.iptv-th.workers.dev/live/4011/playlist.m3u8
+#EXTINF:-1 tvg-chno="45" group-title="🎬 ภาพยนตร์" tvg-logo="https://madoball.com/upload/2816.jpg",🔴 HBO Family
+https://hls.iptv-th.workers.dev/live/4011/playlist.m3u8
+https://godlivetv.io/madoball/2816/playlist.m3u8
+#EXTINF:-1 tvg-chno="46" group-title="🎬 ภาพยนตร์" tvg-logo="https://madoball.com/upload/2819.jpg",🔵 HBO Hits
+https://hls.iptv-th.workers.dev/live/4011/playlist.m3u8
+https://godlivetv.io/madoball/2819/playlist.m3u8
+#EXTINF:-1 tvg-chno="47" group-title="🎬 ภาพยนตร์" tvg-logo="https://madoball.com/upload/2818.jpg",🟠 HBO Signature
+https://hls.iptv-th.workers.dev/live/4011/playlist.m3u8
+https://godlivetv.io/madoball/2818/playlist.m3u8
+#EXTINF:-1 tvg-chno="48" group-title="🎬 ภาพยนตร์" tvg-logo="https://madoball.com/upload/1877.jpg",🟡 True Film 1
+https://hls.iptv-th.workers.dev/live/41243/playlist.m3u8
+#EXTINF:-1 tvg-logo="https://goodiptv.site/images/tv/2OyiZvxJCvD2sC1AzijiJbludMKnDkRChatGPT_Image_10_ก.พ._2569_21_29_37.png" group-title="🎬 ภาพยนตร์",🟡 True Film HD 2
+https://hls.iptv-th.workers.dev/live/4124/playlist.m3u8
+
+#EXTINF:-1 tvg-chno="49" group-title="🎬 ภาพยนตร์" tvg-logo="https://madoball.com/upload/1915.jpg",🟣 True Film Asia
+https://hls.iptv-th.workers.dev/live/4011/playlist.m3u8
+https://godlivetv.io/madoball/1915/playlist.m3u8
+#EXTINF:-1 tvg-chno="50" group-title="🎬 ภาพยนตร์" tvg-logo="https://madoball.com/upload/1875.jpg",🟢 True Movie Hits
+https://hls.iptv-th.workers.dev/live/4000/playlist.m3u8
+https://godlivetv.io/madoball/1875/playlist.m3u8
+#EXTINF:-1 tvg-chno="51" group-title="🎬 ภาพยนตร์" tvg-logo="https://madoball.com/upload/1874.jpg",🔴 True Thai Film
+https://hls.iptv-th.workers.dev/live/4011/playlist.m3u8
+https://godlivetv.io/madoball/1874/playlist.m3u8
+#EXTINF:-1 tvg-chno="52" group-title="🎬 ภาพยนตร์" tvg-logo="https://madoball.com/upload/2650.jpg",🔵 AXN HD
+https://hls.iptv-th.workers.dev/live/4011/playlist.m3u8
+https://godlivetv.io/madoball/2650/playlist.m3u8
+#EXTINF:-1 tvg-chno="53" group-title="🎬 ภาพยนตร์" tvg-logo="https://madoball.com/upload/1416.jpg",🟠 Cool Channel
+https://hls.iptv-th.workers.dev/live/4011/playlist.m3u8
+https://godlivetv.io/madoball/1416/playlist.m3u8
+#EXTINF:-1 tvg-chno="62" group-title="🎬 ภาพยนตร์" tvg-logo="https://madoball.com/upload/2929.jpg",🟡 Rock Entertainment
+https://hls.iptv-th.workers.dev/live/4011/playlist.m3u8
+https://godlivetv.io/madoball/2929/playlist.m3u8
+#EXTINF:-1 tvg-chno="63" group-title="🎬 ภาพยนตร์" tvg-logo="https://madoball.com/upload/261622.jpg",🟣 ROCK X Stream
+https://hls.iptv-th.workers.dev/live/4011/playlist.m3u8
+https://godlivetv.io/madoball/261622/playlist.m3u8
+#EXTINF:-1 tvg-chno="64" group-title="🎬 ภาพยนตร์" tvg-logo="https://madoball.com/upload/1916.jpg",🟢 True Series
+https://hls.iptv-th.workers.dev/live/4011/playlist.m3u8
+https://godlivetv.io/madoball/1916/playlist.m3u8
+#EXTINF:-1 tvg-chno="65" group-title="🎬 ภาพยนตร์" tvg-logo="https://madoball.com/upload/2056.jpg",🔴 True X-Zyte
+https://hls.iptv-th.workers.dev/live/4011/playlist.m3u8
+https://godlivetv.io/madoball/2056/playlist.m3u8
+#EXTINF:-1 tvg-chno="66" group-title="🎬 ภาพยนตร์" tvg-logo="https://madoball.com/upload/2739.jpg",🔵 Warner TV
+https://hls.iptv-th.workers.dev/live/4011/playlist.m3u8
+https://godlivetv.io/madoball/2739/playlist.m3u8
+# =============================================
+# 📺 หมวดหมู่: การ์ตูน (Cartoon)
+# =============================================
+#EXTINF:-1 tvg-chno="" group-title="🎨 การ์ตูน" tvg-logo="https://cdn.madoball.com/upload/8999.jpg",🟠 ช่อง Boom
+https://hls.iptv-th.workers.dev/live/4011/playlist.m3u8
+https://godlivetv.io/madoball/8999/chunks.m3u8
+#EXTINF:-1 tvg-chno="" group-title="🎨 การ์ตูน" tvg-logo="https://cdn.madoball.com/upload/8007.jpg",🟡 ช่อง CN
+https://hls.iptv-th.workers.dev/live/4011/playlist.m3u8
+https://godlivetv.io/madoball/8007/chunks.m3u8
+#EXTINF:-1 tvg-chno="" group-title="🎨 การ์ตูน" tvg-logo="https://cdn.madoball.com/upload/477.jpg",🟣 Cartoonito
+https://hls.iptv-th.workers.dev/live/4011/playlist.m3u8
+https://godlivetv.io/madoball/477/chunks.m3u8
+# =============================================
+# 🎭 หมวดหมู่: บันเทิง (Entertainment)
+# =============================================
+#EXTINF:-1 tvg-chno="54" group-title="🎭 บันเทิง" tvg-logo="https://madoball.com/upload/1418.jpg",🟢 Fashion TV
+https://hls.iptv-th.workers.dev/live/4011/playlist.m3u8
+https://godlivetv.io/madoball/1418/playlist.m3u8
+#EXTINF:-1 tvg-chno="56" group-title="🎭 บันเทิง" tvg-logo="https://madoball.com/upload/8738.jpg",🔴 ITV1
+https://hls.iptv-th.workers.dev/live/4011/playlist.m3u8
+https://godlivetv.io/madoball/8738/playlist.m3u8
+#EXTINF:-1 tvg-chno="57" group-title="🎭 บันเทิง" tvg-logo="https://madoball.com/upload/8737.jpg",🔵 ITV2
+https://hls.iptv-th.workers.dev/live/4011/playlist.m3u8
+https://godlivetv.io/madoball/8737/playlist.m3u8
+#EXTINF:-1 tvg-chno="58" group-title="🎭 บันเทิง" tvg-logo="https://madoball.com/upload/8736.jpg",🟠 ITV3
+https://hls.iptv-th.workers.dev/live/4011/playlist.m3u8
+https://godlivetv.io/madoball/8736/playlist.m3u8
+#EXTINF:-1 tvg-chno="59" group-title="🎭 บันเทิง" tvg-logo="https://madoball.com/upload/8735.jpg",🟡 ITV4
+https://hls.iptv-th.workers.dev/live/4011/playlist.m3u8
+https://godlivetv.io/madoball/8735/playlist.m3u8
+# =============================================
+# 🌍 หมวดหมู่: สารคดี (Documentary)
+# =============================================
+#EXTINF:-1 tvg-chno="12" group-title="🌍 สารคดี" tvg-logo="https://madoball.com/upload/715.jpg",🟣 Thainess TV
+https://hls.iptv-th.workers.dev/live/4011/playlist.m3u8
+https://godlivetv.io/madoball/715/playlist.m3u8
+#EXTINF:-1 tvg-chno="67" group-title="🌍 สารคดี" tvg-logo="https://madoball.com/upload/710.jpg",🟢 Animal Show
+https://hls.iptv-th.workers.dev/live/4011/playlist.m3u8
+https://godlivetv.io/madoball/710/playlist.m3u8
+#EXTINF:-1 tvg-chno="68" group-title="🌍 สารคดี" tvg-logo="https://madoball.com/upload/1854.jpg",🔴 Asian Food Network
+https://hls.iptv-th.workers.dev/live/4011/playlist.m3u8
+https://godlivetv.io/madoball/1854/playlist.m3u8
+#EXTINF:-1 tvg-chno="69" group-title="🌍 สารคดี" tvg-logo="https://madoball.com/upload/1689.jpg",🔵 BBC Lifestyle
+https://hls.iptv-th.workers.dev/live/4011/playlist.m3u8
+https://godlivetv.io/madoball/1689/playlist.m3u8
+#EXTINF:-1 tvg-chno="70" group-title="🌍 สารคดี" tvg-logo="https://madoball.com/upload/1606.jpg",🟠 Discovery Asia
+https://hls.iptv-th.workers.dev/live/4011/playlist.m3u8
+https://godlivetv.io/madoball/1606/playlist.m3u8
+#EXTINF:-1 tvg-chno="71" group-title="🌍 สารคดี" tvg-logo="https://madoball.com/upload/1546.jpg",🟡 Discovery Channel
+https://hls.iptv-th.workers.dev/live/4011/playlist.m3u8
+https://godlivetv.io/madoball/1546/playlist.m3u8
+#EXTINF:-1 tvg-chno="72" group-title="🌍 สารคดี" tvg-logo="https://madoball.com/upload/2347.jpg",🟣 DreamWorks
+https://hls.iptv-th.workers.dev/live/4011/playlist.m3u8
+https://godlivetv.io/madoball/2347/playlist.m3u8
+#EXTINF:-1 tvg-chno="73" group-title="🌍 สารคดี" tvg-logo="https://madoball.com/upload/1845.jpg",🟢 Food Network
+https://hls.iptv-th.workers.dev/live/4011/playlist.m3u8
+https://godlivetv.io/madoball/1845/playlist.m3u8
+#EXTINF:-1 tvg-chno="74" group-title="🌍 สารคดี" tvg-logo="https://madoball.com/upload/1667.jpg",🔴 History Channel
+https://hls.iptv-th.workers.dev/live/4011/playlist.m3u8
+https://godlivetv.io/madoball/1667/playlist.m3u8
+#EXTINF:-1 tvg-chno="75" group-title="🌍 สารคดี" tvg-logo="https://madoball.com/upload/555.jpg",🔵 Mysci
+https://hls.iptv-th.workers.dev/live/4011/playlist.m3u8
+https://godlivetv.io/madoball/555/playlist.m3u8
+#EXTINF:-1 tvg-chno="76" group-title="🌍 สารคดี" tvg-logo="https://madoball.com/upload/1496.jpg",🟠 TLC
+https://hls.iptv-th.workers.dev/live/4011/playlist.m3u8
+https://godlivetv.io/madoball/1496/playlist.m3u8
+#EXTINF:-1 tvg-chno="77" group-title="🌍 สารคดี" tvg-logo="https://madoball.com/upload/722.jpg",🟡 True Explore SCI
+https://hls.iptv-th.workers.dev/live/4025/playlist.m3u8
+#EXTINF:-1 tvg-chno="78" group-title="🌍 สารคดี" tvg-logo="https://madoball.com/upload/740.jpg",🟣 True Explore WILD
+https://hls.iptv-th.workers.dev/live/4011/playlist.m3u8
+https://hls.iptv-th.workers.dev/live/4027/playlist.m3u8
+# =============================================
+# 🎲 หมวดหมู่: อื่นๆ (Others)
+# =============================================
+#EXTINF:-1 tvg-chno="79" group-title="🎲 อื่นๆ" tvg-logo="https://madoball.com/upload/1600.jpg",🟢 ABC Australia
+https://hls.iptv-th.workers.dev/live/4011/playlist.m3u8
+https://godlivetv.io/madoball/1600/playlist.m3u8
+#EXTINF:-1 tvg-chno="80" group-title="🎲 อื่นๆ" tvg-logo="https://madoball.com/upload/61286.jpg",🔴 Bein France 1
+https://hls.iptv-th.workers.dev/live/4011/playlist.m3u8
+https://godlivetv.io/madoball/61286/playlist.m3u8
+#EXTINF:-1 tvg-chno="81" group-title="🎲 อื่นๆ" tvg-logo="https://madoball.com/upload/61283.jpg",🔵 Bein France 2
+https://hls.iptv-th.workers.dev/live/4011/playlist.m3u8
+https://godlivetv.io/madoball/61283/playlist.m3u8
+#EXTINF:-1 tvg-chno="82" group-title="🎲 อื่นๆ" tvg-logo="https://madoball.com/upload/61281.jpg",🟠 Bein France 3
+https://hls.iptv-th.workers.dev/live/4011/playlist.m3u8
+https://godlivetv.io/madoball/61281/playlist.m3u8
+#EXTINF:-1 tvg-chno="83" group-title="🎲 อื่นๆ" tvg-logo="https://madoball.com/upload/8999.jpg",🟡 Boomerang
+https://hls.iptv-th.workers.dev/live/4011/playlist.m3u8
+https://godlivetv.io/madoball/8999/playlist.m3u8
+#EXTINF:-1 tvg-chno="84" group-title="🎲 อื่นๆ" tvg-logo="https://madoball.com/upload/8007.jpg",🟣 Cartoon Network
+https://hls.iptv-th.workers.dev/live/4011/playlist.m3u8
+https://godlivetv.io/madoball/8007/playlist.m3u8
+#EXTINF:-1 tvg-chno="85" group-title="🎲 อื่นๆ" tvg-logo="https://madoball.com/upload/477.jpg",🟢 Cartoonito
+https://hls.iptv-th.workers.dev/live/4011/playlist.m3u8
+https://godlivetv.io/madoball/477/playlist.m3u8
+#EXTINF:-1 tvg-chno="86" group-title="🎲 อื่นๆ" tvg-logo="https://madoball.com/upload/402.jpg",🔴 CCTV-4
+https://hls.iptv-th.workers.dev/live/4011/playlist.m3u8
+https://godlivetv.io/madoball/402/playlist.m3u8
+#EXTINF:-1 tvg-chno="87" group-title="🎲 อื่นๆ" tvg-logo="https://madoball.com/upload/2875.jpg",🔵 Nick Jr.
+https://hls.iptv-th.workers.dev/live/4011/playlist.m3u8
+https://godlivetv.io/madoball/2875/playlist.m3u8
+#EXTINF:-1 tvg-chno="88" group-title="🎲 อื่นๆ" tvg-logo="https://madoball.com/upload/2029.jpg",🟠 Nickelodeon
+https://hls.iptv-th.workers.dev/live/4011/playlist.m3u8
+https://godlivetv.io/madoball/2029/playlist.m3u8
+# =============================================
+# ⚽ หมวดหมู่: กีฬา (Sports)
+# =============================================
+#EXTINF:-1 tvg-chno="89" group-title="⚽ กีฬา" tvg-logo="https://cdn.madoball.com/upload/13918.jpg",🟡 Arena Sport 1
+https://hls.iptv-th.workers.dev/live/4011/playlist.m3u8
+https://godlivetv.io/madoball/13918/playlist.m3u8
+#EXTINF:-1 tvg-chno="90" group-title="⚽ กีฬา" tvg-logo="https://cdn.madoball.com/upload/13917.jpg",🟣 Arena Sport 2
+https://hls.iptv-th.workers.dev/live/4011/playlist.m3u8
+https://godlivetv.io/madoball/13917/playlist.m3u8
+#EXTINF:-1 tvg-chno="91" group-title="⚽ กีฬา" tvg-logo="https://cdn.madoball.com/upload/13916.jpg",🟢 Arena Sport 3
+https://hls.iptv-th.workers.dev/live/4011/playlist.m3u8
+https://godlivetv.io/madoball/13916/playlist.m3u8
+#EXTINF:-1 tvg-chno="92" group-title="⚽ กีฬา" tvg-logo="https://cdn.madoball.com/upload/13915.jpg",🔴 Arena Sport 4
+https://hls.iptv-th.workers.dev/live/4011/playlist.m3u8
+https://godlivetv.io/madoball/13915/playlist.m3u8
+#EXTINF:-1 tvg-chno="93" group-title="⚽ กีฬา" tvg-logo="https://cdn.madoball.com/upload/13071.jpg",🔵 Arena Sport 5
+https://hls.iptv-th.workers.dev/live/4011/playlist.m3u8
+https://godlivetv.io/madoball/13071/playlist.m3u8
+#EXTINF:-1 tvg-chno="94" group-title="⚽ กีฬา" tvg-logo="https://cdn.madoball.com/upload/7424.jpg",🟠 beIN SPORTS 1
+https://hls.iptv-th.workers.dev/live/4011/playlist.m3u8
+https://godlivetv.io/madoball/7424/playlist.m3u8
+#EXTINF:-1 tvg-chno="95" group-title="⚽ กีฬา" tvg-logo="https://cdn.madoball.com/upload/7423.jpg",🟡 beIN SPORTS 2
+https://hls.iptv-th.workers.dev/live/4011/playlist.m3u8
+https://godlivetv.io/madoball/7423/playlist.m3u8
+#EXTINF:-1 tvg-chno="96" group-title="⚽ กีฬา" tvg-logo="https://cdn.madoball.com/upload/7422.jpg",🟣 beIN SPORTS 3
+https://hls.iptv-th.workers.dev/live/4011/playlist.m3u8
+https://godlivetv.io/madoball/7422/playlist.m3u8
+#EXTINF:-1 tvg-chno="97" group-title="⚽ กีฬา" tvg-logo="https://cdn.madoball.com/upload/7421.jpg",🟢 beIN SPORTS 4
+https://hls.iptv-th.workers.dev/live/4011/playlist.m3u8
+https://godlivetv.io/madoball/7421/playlist.m3u8
+#EXTINF:-1 tvg-chno="98" group-title="⚽ กีฬา" tvg-logo="https://cdn.madoball.com/upload/7420.jpg",🔴 beIN SPORTS 5
+https://hls.iptv-th.workers.dev/live/4011/playlist.m3u8
+https://godlivetv.io/madoball/7420/playlist.m3u8
+#EXTINF:-1 tvg-chno="99" group-title="⚽ กีฬา" tvg-logo="https://cdn.madoball.com/upload/7419.jpg",🔵 beIN SPORTS 6
+https://hls.iptv-th.workers.dev/live/4011/playlist.m3u8
+https://godlivetv.io/madoball/7419/playlist.m3u8
+#EXTINF:-1 tvg-chno="100" group-title="⚽ กีฬา" tvg-logo="https://cdn.madoball.com/upload/7418.jpg",🟠 beIN SPORTS 7
+https://hls.iptv-th.workers.dev/live/4011/playlist.m3u8
+https://godlivetv.io/madoball/7418/playlist.m3u8
+#EXTINF:-1 tvg-chno="101" group-title="⚽ กีฬา" tvg-logo="https://cdn.madoball.com/upload/7417.jpg",🟡 beIN SPORTS 8
+https://hls.iptv-th.workers.dev/live/4011/playlist.m3u8
+https://godlivetv.io/madoball/7417/playlist.m3u8
+#EXTINF:-1 tvg-chno="102" group-title="⚽ กีฬา" tvg-logo="https://cdn.madoball.com/upload/7416.jpg",🟣 beIN SPORTS 9
+https://hls.iptv-th.workers.dev/live/4011/playlist.m3u8
+https://godlivetv.io/madoball/7416/playlist.m3u8
+#EXTINF:-1 tvg-chno="103" group-title="⚽ กีฬา" tvg-logo="https://cdn.madoball.com/upload/7415.jpg",🟢 beIN SPORTS 10
+https://hls.iptv-th.workers.dev/live/4011/playlist.m3u8
+https://godlivetv.io/madoball/7415/playlist.m3u8
+#EXTINF:-1 tvg-chno="104" group-title="⚽ กีฬา" tvg-logo="https://cdn.madoball.com/upload/10331.jpg",🔴 Being Sport USA
+https://hls.iptv-th.workers.dev/live/4011/playlist.m3u8
+https://godlivetv.io/madoball/10331/playlist.m3u8
+#EXTINF:-1 tvg-chno="105" group-title="⚽ กีฬา" tvg-logo="https://cdn.madoball.com/upload/1260.jpg",🔵 BG Sports 1
+https://hls.iptv-th.workers.dev/live/4011/playlist.m3u8
+https://godlivetv.io/madoball/1260/playlist.m3u8
+#EXTINF:-1 tvg-chno="106" group-title="⚽ กีฬา" tvg-logo="https://cdn.madoball.com/upload/1259.jpg",🟠 BG Sports 2
+https://hls.iptv-th.workers.dev/live/4011/playlist.m3u8
+https://godlivetv.io/madoball/1259/playlist.m3u8
+#EXTINF:-1 tvg-chno="107" group-title="⚽ กีฬา" tvg-logo="https://cdn.madoball.com/upload/1258.jpg",🟡 BG Sports 3
+https://hls.iptv-th.workers.dev/live/4011/playlist.m3u8
+https://godlivetv.io/madoball/1258/playlist.m3u8
+#EXTINF:-1 tvg-chno="108" group-title="⚽ กีฬา" tvg-logo="https://cdn.madoball.com/upload/1257.jpg",🟣 BG Sports 4
+https://hls.iptv-th.workers.dev/live/4011/playlist.m3u8
+https://godlivetv.io/madoball/1257/playlist.m3u8
+#EXTINF:-1 tvg-chno="109" group-title="⚽ กีฬา" tvg-logo="https://cdn.madoball.com/upload/11921.jpg",🟢 CBS Sports
+https://hls.iptv-th.workers.dev/live/4011/playlist.m3u8
+https://godlivetv.io/madoball/11921/playlist.m3u8
+#EXTINF:-1 tvg-chno="110" group-title="⚽ กีฬา" tvg-logo="https://cdn.madoball.com/upload/11924.jpg",🔴 ESPN 1
+https://hls.iptv-th.workers.dev/live/4011/playlist.m3u8
+https://godlivetv.io/madoball/11924/playlist.m3u8
+#EXTINF:-1 tvg-chno="111" group-title="⚽ กีฬา" tvg-logo="https://cdn.madoball.com/upload/11923.jpg",🔵 ESPN 2
+https://hls.iptv-th.workers.dev/live/4011/playlist.m3u8
+https://godlivetv.io/madoball/11923/playlist.m3u8
+#EXTINF:-1 tvg-chno="112" group-title="⚽ กีฬา" tvg-logo="https://cdn.madoball.com/upload/1368.jpg",🟠 Eurosport
+https://hls.iptv-th.workers.dev/live/4011/playlist.m3u8
+https://godlivetv.io/madoball/1368/playlist.m3u8
+#EXTINF:-1 tvg-chno="113" group-title="⚽ กีฬา" tvg-logo="https://cdn.madoball.com/upload/11936.jpg",🟡 EuroSport 1
+https://hls.iptv-th.workers.dev/live/4011/playlist.m3u8
+https://godlivetv.io/madoball/11936/playlist.m3u8
+#EXTINF:-1 tvg-chno="114" group-title="⚽ กีฬา" tvg-logo="https://cdn.madoball.com/upload/11935.jpg",🟣 EuroSport 2
+https://hls.iptv-th.workers.dev/live/4011/playlist.m3u8
+https://godlivetv.io/madoball/11935/playlist.m3u8
+#EXTINF:-1 tvg-chno="115" group-title="⚽ กีฬา" tvg-logo="https://cdn.madoball.com/upload/61289.jpg",🟢 Fight Sports
+https://hls.iptv-th.workers.dev/live/4011/playlist.m3u8
+https://godlivetv.io/madoball/61289/playlist.m3u8
+#EXTINF:-1 tvg-chno="116" group-title="⚽ กีฬา" tvg-logo="https://cdn.madoball.com/upload/11926.jpg",🔴 Fox Sports 1 USA
+https://hls.iptv-th.workers.dev/live/4011/playlist.m3u8
+https://godlivetv.io/madoball/11926/playlist.m3u8
+#EXTINF:-1 tvg-chno="117" group-title="⚽ กีฬา" tvg-logo="https://cdn.madoball.com/upload/11925.jpg",🔵 Fox Sports 2 USA
+https://hls.iptv-th.workers.dev/live/4011/playlist.m3u8
+https://godlivetv.io/madoball/11925/playlist.m3u8
+#EXTINF:-1 tvg-chno="118" group-title="⚽ กีฬา" tvg-logo="https://cdn.madoball.com/upload/7203.jpg",🟠 Golf +
+https://hls.iptv-th.workers.dev/live/4011/playlist.m3u8
+https://godlivetv.io/madoball/7203/playlist.m3u8
+#EXTINF:-1 tvg-chno="119" group-title="⚽ กีฬา" tvg-logo="https://cdn.madoball.com/upload/12684.jpg",🟡 Liverpool TV
+https://hls.iptv-th.workers.dev/live/4011/playlist.m3u8
+https://godlivetv.io/madoball/12684/playlist.m3u8
+#EXTINF:-1 tvg-chno="120" group-title="⚽ กีฬา" tvg-logo="https://cdn.madoball.com/upload/10330.jpg",🟣 MLB Network
+https://hls.iptv-th.workers.dev/live/4011/playlist.m3u8
+https://godlivetv.io/madoball/10330/playlist.m3u8
+#EXTINF:-1 tvg-chno="121" group-title="⚽ กีฬา" tvg-logo="https://cdn.madoball.com/upload/1239.jpg",🟢 MUTV
+https://hls.iptv-th.workers.dev/live/4011/playlist.m3u8
+https://godlivetv.io/madoball/1239/playlist.m3u8
+#EXTINF:-1 tvg-chno="122" group-title="⚽ กีฬา" tvg-logo="https://cdn.madoball.com/upload/12682.jpg",🔴 MUTV
+https://hls.iptv-th.workers.dev/live/4011/playlist.m3u8
+https://godlivetv.io/madoball/12682/playlist.m3u8
+#EXTINF:-1 tvg-chno="123" group-title="⚽ กีฬา" tvg-logo="https://cdn.madoball.com/upload/8739.jpg",🔵 NBA
+https://hls.iptv-th.workers.dev/live/4011/playlist.m3u8
+https://godlivetv.io/madoball/8739/playlist.m3u8
+#EXTINF:-1 tvg-chno="124" group-title="⚽ กีฬา" tvg-logo="https://cdn.madoball.com/upload/11920.jpg",🟠 NBC Sports
+https://hls.iptv-th.workers.dev/live/4011/playlist.m3u8
+https://godlivetv.io/madoball/11920/playlist.m3u8
+#EXTINF:-1 tvg-chno="125" group-title="⚽ กีฬา" tvg-logo="https://cdn.madoball.com/upload/11922.jpg",🟡 NFL
+https://hls.iptv-th.workers.dev/live/4011/playlist.m3u8
+https://godlivetv.io/madoball/11922/playlist.m3u8
+#EXTINF:-1 tvg-chno="127" group-title="⚽ กีฬา" tvg-logo="https://cdn.madoball.com/upload/81433.jpg",🟣 ONE Championship
+https://hls.iptv-th.workers.dev/live/4011/playlist.m3u8
+https://godlivetv.io/madoball/81433/playlist.m3u8
+#EXTINF:-1 tvg-chno="128" group-title="⚽ กีฬา" tvg-logo="https://cdn.madoball.com/upload/1485.jpg",🟢 Play Sports 41
+https://hls.iptv-th.workers.dev/live/4011/playlist.m3u8
+https://godlivetv.io/madoball/1485/playlist.m3u8
+#EXTINF:-1 tvg-chno="129" group-title="⚽ กีฬา" tvg-logo="https://cdn.madoball.com/upload/1439.jpg",🔴 Play Sports 48
+https://hls.iptv-th.workers.dev/live/4011/playlist.m3u8
+https://godlivetv.io/madoball/1439/playlist.m3u8
+#EXTINF:-1 tvg-chno="130" group-title="⚽ กีฬา" tvg-logo="https://cdn.madoball.com/upload/1484.jpg",🔵 Play Sports 55
+https://hls.iptv-th.workers.dev/live/4011/playlist.m3u8
+https://godlivetv.io/madoball/1484/playlist.m3u8
+#EXTINF:-1 tvg-chno="131" group-title="⚽ กีฬา" tvg-logo="https://cdn.madoball.com/upload/1483.jpg",🟠 Play Sports 56
+https://hls.iptv-th.workers.dev/live/4011/playlist.m3u8
+https://godlivetv.io/madoball/1483/playlist.m3u8
+#EXTINF:-1 tvg-chno="132" group-title="⚽ กีฬา" tvg-logo="https://cdn.madoball.com/upload/1441.jpg",🟡 Play Sports 57
+https://hls.iptv-th.workers.dev/live/4011/playlist.m3u8
+https://godlivetv.io/madoball/1441/playlist.m3u8
+#EXTINF:-1 tvg-chno="133" group-title="⚽ กีฬา" tvg-logo="https://cdn.madoball.com/upload/1440.jpg",🟣 Play Sports 58
+https://hls.iptv-th.workers.dev/live/4011/playlist.m3u8
+https://godlivetv.io/madoball/1440/playlist.m3u8
+#EXTINF:-1 tvg-chno="134" group-title="⚽ กีฬา" tvg-logo="https://cdn.madoball.com/upload/1482.jpg",🟢 Play Sports 61
+https://hls.iptv-th.workers.dev/live/4011/playlist.m3u8
+https://godlivetv.io/madoball/1482/playlist.m3u8
+#EXTINF:-1 tvg-chno="135" group-title="⚽ กีฬา" tvg-logo="https://cdn.madoball.com/upload/1481.jpg",🔴 Play Sports 62
+https://hls.iptv-th.workers.dev/live/4011/playlist.m3u8
+https://godlivetv.io/madoball/1481/playlist.m3u8
+#EXTINF:-1 tvg-chno="136" group-title="⚽ กีฬา" tvg-logo="https://cdn.madoball.com/upload/1480.jpg",🔵 Play Sports 63
+https://hls.iptv-th.workers.dev/live/4011/playlist.m3u8
+https://godlivetv.io/madoball/1480/playlist.m3u8
+#EXTINF:-1 tvg-chno="137" group-title="⚽ กีฬา" tvg-logo="https://cdn.madoball.com/upload/1438.jpg",🟠 Play Sports 64
+https://hls.iptv-th.workers.dev/live/4011/playlist.m3u8
+https://godlivetv.io/madoball/1438/playlist.m3u8
+#EXTINF:-1 tvg-chno="138" group-title="⚽ กีฬา" tvg-logo="https://cdn.madoball.com/upload/1479.jpg",🟡 Play Sports 66
+https://hls.iptv-th.workers.dev/live/4011/playlist.m3u8
+https://godlivetv.io/madoball/1479/playlist.m3u8
+#EXTINF:-1 tvg-chno="139" group-title="⚽ กีฬา" tvg-logo="https://cdn.madoball.com/upload/1437.jpg",🟣 Play Sports 67
+https://hls.iptv-th.workers.dev/live/4011/playlist.m3u8
+https://godlivetv.io/madoball/1437/playlist.m3u8
+#EXTINF:-1 tvg-chno="140" group-title="⚽ กีฬา" tvg-logo="https://cdn.madoball.com/upload/1478.jpg",🟢 Play Sports 69
+https://hls.iptv-th.workers.dev/live/4011/playlist.m3u8
+https://godlivetv.io/madoball/1478/playlist.m3u8
+#EXTINF:-1 tvg-chno="141" group-title="⚽ กีฬา" tvg-logo="https://cdn.madoball.com/upload/1477.jpg",🔴 Play Sports 71
+https://hls.iptv-th.workers.dev/live/4011/playlist.m3u8
+https://godlivetv.io/madoball/1477/playlist.m3u8
+#EXTINF:-1 tvg-chno="142" group-title="⚽ กีฬา" tvg-logo="https://cdn.madoball.com/upload/1476.jpg",🔵 Play Sports 72
+https://hls.iptv-th.workers.dev/live/4011/playlist.m3u8
+https://godlivetv.io/madoball/1476/playlist.m3u8
+#EXTINF:-1 tvg-chno="143" group-title="⚽ กีฬา" tvg-logo="https://cdn.madoball.com/upload/1475.jpg",🟠 Play Sports 73
+https://hls.iptv-th.workers.dev/live/4011/playlist.m3u8
+https://godlivetv.io/madoball/1475/playlist.m3u8
+#EXTINF:-1 tvg-chno="144" group-title="⚽ กีฬา" tvg-logo="https://cdn.madoball.com/upload/1433.jpg",🟡 Play Sports 74
+https://hls.iptv-th.workers.dev/live/4011/playlist.m3u8
+https://godlivetv.io/madoball/1433/playlist.m3u8
+#EXTINF:-1 tvg-chno="145" group-title="⚽ กีฬา" tvg-logo="https://cdn.madoball.com/upload/1432.jpg",🟣 Play Sports 75
+https://hls.iptv-th.workers.dev/live/4011/playlist.m3u8
+https://godlivetv.io/madoball/1432/playlist.m3u8
+#EXTINF:-1 tvg-chno="146" group-title="⚽ กีฬา" tvg-logo="https://cdn.madoball.com/upload/1436.jpg",🟢 Play Sports 90
+https://hls.iptv-th.workers.dev/live/4011/playlist.m3u8
+https://godlivetv.io/madoball/1436/playlist.m3u8
+#EXTINF:-1 tvg-chno="147" group-title="⚽ กีฬา" tvg-logo="https://cdn.madoball.com/upload/1431.jpg",🔴 Premier Sports
+https://hls.iptv-th.workers.dev/live/4011/playlist.m3u8
+https://godlivetv.io/madoball/1431/playlist.m3u8
+#EXTINF:-1 tvg-chno="148" group-title="⚽ กีฬา" tvg-logo="https://cdn.madoball.com/upload/1231.jpg",🔵 Realmadrid TV
+https://hls.iptv-th.workers.dev/live/4011/playlist.m3u8
+https://godlivetv.io/madoball/1231/playlist.m3u8
+#EXTINF:-1 tvg-chno="149" group-title="⚽ กีฬา" tvg-logo="https://cdn.madoball.com/upload/1373.jpg",🟠 RED BULL
+https://hls.iptv-th.workers.dev/live/4011/playlist.m3u8
+https://godlivetv.io/madoball/1373/playlist.m3u8
+#EXTINF:-1 tvg-chno="150" group-title="⚽ กีฬา" tvg-logo="https://cdn.madoball.com/upload/11972.jpg",🟡 Sky Sports +
+https://hls.iptv-th.workers.dev/live/4011/playlist.m3u8
+https://godlivetv.io/madoball/11972/playlist.m3u8
+#EXTINF:-1 tvg-chno="151" group-title="⚽ กีฬา" tvg-logo="https://cdn.madoball.com/upload/11952.jpg",🟣 Sky Sports Action
+https://hls.iptv-th.workers.dev/live/4011/playlist.m3u8
+https://godlivetv.io/madoball/11952/playlist.m3u8
+#EXTINF:-1 tvg-chno="152" group-title="⚽ กีฬา" tvg-logo="https://cdn.madoball.com/upload/11951.jpg",🟢 Sky Sports Cricket
+https://hls.iptv-th.workers.dev/live/4011/playlist.m3u8
+https://godlivetv.io/madoball/11951/playlist.m3u8
+#EXTINF:-1 tvg-chno="153" group-title="⚽ กีฬา" tvg-logo="https://cdn.madoball.com/upload/11973.jpg",🔴 Sky Sports F1
+https://hls.iptv-th.workers.dev/live/4011/playlist.m3u8
+https://godlivetv.io/madoball/11973/playlist.m3u8
+#EXTINF:-1 tvg-chno="154" group-title="⚽ กีฬา" tvg-logo="https://cdn.madoball.com/upload/11974.jpg",🔵 Sky Sports Football
+https://hls.iptv-th.workers.dev/live/4011/playlist.m3u8
+https://godlivetv.io/madoball/11974/playlist.m3u8
+#EXTINF:-1 tvg-chno="155" group-title="⚽ กีฬา" tvg-logo="https://cdn.madoball.com/upload/11950.jpg",🟠 Sky Sports Golf
+https://hls.iptv-th.workers.dev/live/4011/playlist.m3u8
+https://godlivetv.io/madoball/11950/playlist.m3u8
+#EXTINF:-1 tvg-chno="156" group-title="⚽ กีฬา" tvg-logo="https://cdn.madoball.com/upload/11949.jpg",🟡 Sky Sports Main Event
+https://hls.iptv-th.workers.dev/live/4011/playlist.m3u8
+https://godlivetv.io/madoball/11949/playlist.m3u8
+#EXTINF:-1 tvg-chno="157" group-title="⚽ กีฬา" tvg-logo="https://cdn.madoball.com/upload/11975.jpg",🟣 Sky Sports Mix
+https://hls.iptv-th.workers.dev/live/4011/playlist.m3u8
+https://godlivetv.io/madoball/11975/playlist.m3u8
+#EXTINF:-1 tvg-chno="158" group-title="⚽ กีฬา" tvg-logo="https://cdn.madoball.com/upload/11976.jpg",🟢 Sky Sports News
+https://hls.iptv-th.workers.dev/live/4011/playlist.m3u8
+https://godlivetv.io/madoball/11976/playlist.m3u8
+#EXTINF:-1 tvg-chno="159" group-title="⚽ กีฬา" tvg-logo="https://cdn.madoball.com/upload/11948.jpg",🔴 Sky Sports Premier League
+https://hls.iptv-th.workers.dev/live/4011/playlist.m3u8
+https://godlivetv.io/madoball/11948/playlist.m3u8
+#EXTINF:-1 tvg-chno="160" group-title="⚽ กีฬา" tvg-logo="https://cdn.madoball.com/upload/11977.jpg",🔵 Sky Sports Racing
+https://hls.iptv-th.workers.dev/live/4011/playlist.m3u8
+https://godlivetv.io/madoball/11977/playlist.m3u8
+#EXTINF:-1 tvg-chno="161" group-title="⚽ กีฬา" tvg-logo="https://cdn.madoball.com/upload/63481.jpg",🟠 Sport TV 1
+https://hls.iptv-th.workers.dev/live/4011/playlist.m3u8
+https://godlivetv.io/madoball/63481/playlist.m3u8
+#EXTINF:-1 tvg-chno="162" group-title="⚽ กีฬา" tvg-logo="https://cdn.madoball.com/upload/63478.jpg",🟡 Sport TV 2
+https://hls.iptv-th.workers.dev/live/4011/playlist.m3u8
+https://godlivetv.io/madoball/63478/playlist.m3u8
+#EXTINF:-1 tvg-chno="163" group-title="⚽ กีฬา" tvg-logo="https://cdn.madoball.com/upload/63475.jpg",🟣 Sport TV 3
+https://hls.iptv-th.workers.dev/live/4011/playlist.m3u8
+https://godlivetv.io/madoball/63475/playlist.m3u8
+#EXTINF:-1 tvg-chno="164" group-title="⚽ กีฬา" tvg-logo="https://cdn.madoball.com/upload/63472.jpg",🟢 Sport TV 4
+https://hls.iptv-th.workers.dev/live/4011/playlist.m3u8
+https://godlivetv.io/madoball/63472/playlist.m3u8
+#EXTINF:-1 tvg-chno="165" group-title="⚽ กีฬา" tvg-logo="https://cdn.madoball.com/upload/63471.jpg",🔴 Sport TV 5
+https://hls.iptv-th.workers.dev/live/4011/playlist.m3u8
+https://godlivetv.io/madoball/63471/playlist.m3u8
+#EXTINF:-1 tvg-chno="166" group-title="⚽ กีฬา" tvg-logo="https://cdn.madoball.com/upload/15787.jpg",🔵 Sportsnet 360
+https://hls.iptv-th.workers.dev/live/4011/playlist.m3u8
+https://godlivetv.io/madoball/15787/playlist.m3u8
+#EXTINF:-1 tvg-chno="167" group-title="⚽ กีฬา" tvg-logo="https://cdn.madoball.com/upload/16299.jpg",🟠 Sportsnet ONE
+https://hls.iptv-th.workers.dev/live/4011/playlist.m3u8
+https://godlivetv.io/madoball/16299/playlist.m3u8
+#EXTINF:-1 tvg-chno="168" group-title="⚽ กีฬา" tvg-logo="https://cdn.madoball.com/upload/14975.jpg",🟡 Sportsnet Ontario
+https://hls.iptv-th.workers.dev/live/4011/playlist.m3u8
+https://godlivetv.io/madoball/14975/playlist.m3u8
+#EXTINF:-1 tvg-chno="169" group-title="⚽ กีฬา" tvg-logo="https://cdn.madoball.com/upload/16302.jpg",🟣 Sportsnet West
+https://hls.iptv-th.workers.dev/live/4011/playlist.m3u8
+https://godlivetv.io/madoball/16302/playlist.m3u8
+#EXTINF:-1 tvg-chno="170" group-title="⚽ กีฬา" tvg-logo="https://cdn.madoball.com/upload/16304.jpg",🟢 Sportsnet World
+https://hls.iptv-th.workers.dev/live/4011/playlist.m3u8
+https://godlivetv.io/madoball/16304/playlist.m3u8
+#EXTINF:-1 tvg-chno="171" group-title="⚽ กีฬา" tvg-logo="https://cdn.madoball.com/upload/2027.jpg",🔴 SPOTV 1
+https://hls.iptv-th.workers.dev/live/4011/playlist.m3u8
+https://godlivetv.io/madoball/2027/playlist.m3u8
+#EXTINF:-1 tvg-chno="172" group-title="⚽ กีฬา" tvg-logo="https://cdn.madoball.com/upload/2023.jpg",🔵 SPOTV 2
+https://hls.iptv-th.workers.dev/live/4011/playlist.m3u8
+https://godlivetv.io/madoball/2023/playlist.m3u8
+#EXTINF:-1 tvg-chno="173" group-title="⚽ กีฬา" tvg-logo="https://cdn.madoball.com/upload/435.jpg",🟠 T Sport Channel
+https://hls.iptv-th.workers.dev/live/4011/playlist.m3u8
+https://godlivetv.io/madoball/435/playlist.m3u8
+#EXTINF:-1 tvg-chno="174" group-title="⚽ กีฬา" tvg-logo="https://cdn.madoball.com/upload/10332.jpg",🟡 Tennis Channel
+https://hls.iptv-th.workers.dev/live/4011/playlist.m3u8
+https://godlivetv.io/madoball/10332/playlist.m3u8
+#EXTINF:-1 tvg-chno="175" group-title="⚽ กีฬา" tvg-logo="https://cdn.madoball.com/upload/11947.jpg",🟣 TNT Sport 1
+https://hls.iptv-th.workers.dev/live/4011/playlist.m3u8
+https://godlivetv.io/madoball/11947/playlist.m3u8
+#EXTINF:-1 tvg-chno="176" group-title="⚽ กีฬา" tvg-logo="https://cdn.madoball.com/upload/11941.jpg",🟢 TNT Sport 2
+https://hls.iptv-th.workers.dev/live/4011/playlist.m3u8
+https://godlivetv.io/madoball/11941/playlist.m3u8
+#EXTINF:-1 tvg-chno="177" group-title="⚽ กีฬา" tvg-logo="https://cdn.madoball.com/upload/11940.jpg",🔴 TNT Sport 3
+https://hls.iptv-th.workers.dev/live/4011/playlist.m3u8
+https://godlivetv.io/madoball/11940/playlist.m3u8
+#EXTINF:-1 tvg-chno="178" group-title="⚽ กีฬา" tvg-logo="https://cdn.madoball.com/upload/11939.jpg",🔵 TNT Sport 4
+https://hls.iptv-th.workers.dev/live/4011/playlist.m3u8
+https://godlivetv.io/madoball/11939/playlist.m3u8
+#EXTINF:-1 tvg-chno="179" group-title="⚽ กีฬา" tvg-logo="https://cdn.madoball.com/upload/2892.jpg",🟠 True Sport 1
+https://hls.iptv-th.workers.dev/live/4011/playlist.m3u8
+https://godlivetv.io/madoball/2892/playlist.m3u8
+#EXTINF:-1 tvg-chno="180" group-title="⚽ กีฬา" tvg-logo="https://cdn.madoball.com/upload/2891.jpg",🟡 True Sport 2
+https://hls.iptv-th.workers.dev/live/4011/playlist.m3u8
+https://godlivetv.io/madoball/2891/playlist.m3u8
+#EXTINF:-1 tvg-chno="181" group-title="⚽ กีฬา" tvg-logo="https://cdn.madoball.com/upload/2890.jpg",🟣 True Sport 3
+https://hls.iptv-th.workers.dev/live/4011/playlist.m3u8
+https://godlivetv.io/madoball/2890/playlist.m3u8
+#EXTINF:-1 tvg-chno="182" group-title="⚽ กีฬา" tvg-logo="https://cdn.madoball.com/upload/2889.jpg",🟢 True Sport 4
+https://hls.iptv-th.workers.dev/live/4011/playlist.m3u8
+https://godlivetv.io/madoball/2889/playlist.m3u8
+#EXTINF:-1 tvg-chno="183" group-title="⚽ กีฬา" tvg-logo="https://cdn.madoball.com/upload/2888.jpg",🔴 True Sport 5
+https://hls.iptv-th.workers.dev/live/4011/playlist.m3u8
+https://godlivetv.io/madoball/2888/playlist.m3u8
+#EXTINF:-1 tvg-chno="184" group-title="⚽ กีฬา" tvg-logo="https://cdn.madoball.com/upload/2829.jpg",🔵 True Sport 7
+https://hls.iptv-th.workers.dev/live/4011/playlist.m3u8
+https://godlivetv.io/madoball/2829/playlist.m3u8
+#EXTINF:-1 tvg-chno="185" group-title="⚽ กีฬา" tvg-logo="https://cdn.madoball.com/upload/2101.jpg",🟠 True Tennis
+https://hls.iptv-th.workers.dev/live/4011/playlist.m3u8
+https://godlivetv.io/madoball/2101/playlist.m3u8
+#EXTINF:-1 tvg-chno="186" group-title="⚽ กีฬา" tvg-logo="https://cdn.madoball.com/upload/11904.jpg",🟡 TSN 1
+https://hls.iptv-th.workers.dev/live/4011/playlist.m3u8
+https://godlivetv.io/madoball/11904/playlist.m3u8
+#EXTINF:-1 tvg-chno="187" group-title="⚽ กีฬา" tvg-logo="https://cdn.madoball.com/upload/11903.jpg",🟣 TSN 2
+https://hls.iptv-th.workers.dev/live/4011/playlist.m3u8
+https://godlivetv.io/madoball/11903/playlist.m3u8
+#EXTINF:-1 tvg-chno="188" group-title="⚽ กีฬา" tvg-logo="https://cdn.madoball.com/upload/11902.jpg",🟢 TSN 3
+https://hls.iptv-th.workers.dev/live/4011/playlist.m3u8
+https://godlivetv.io/madoball/11902/playlist.m3u8
+#EXTINF:-1 tvg-chno="189" group-title="⚽ กีฬา" tvg-logo="https://cdn.madoball.com/upload/11901.jpg",🔴 TSN 4
+https://hls.iptv-th.workers.dev/live/4011/playlist.m3u8
+https://godlivetv.io/madoball/11901/playlist.m3u8
+#EXTINF:-1 tvg-chno="190" group-title="⚽ กีฬา" tvg-logo="https://cdn.madoball.com/upload/11900.jpg",🔵 TSN 5
+https://hls.iptv-th.workers.dev/live/4011/playlist.m3u8
+https://godlivetv.io/madoball/11900/playlist.m3u8
+#EXTINF:-1 tvg-chno="191" group-title="⚽ กีฬา" tvg-logo="https://cdn.madoball.com/upload/1498.jpg",🟠 W-sport
+https://hls.iptv-th.workers.dev/live/4011/playlist.m3u8
+https://godlivetv.io/madoball/1498/playlist.m3u8
+#EXTINF:-1 tvg-chno="192" group-title="⚽ กีฬา" tvg-logo="https://cdn.madoball.com/upload/8740.jpg",🟡 Willow Cricket
+https://hls.iptv-th.workers.dev/live/4011/playlist.m3u8
+https://godlivetv.io/madoball/8740/playlist.m3u8
+#EXTINF:-1 tvg-chno="193" group-title="⚽ กีฬา" tvg-logo="https://cdn.madoball.com/upload/10329.jpg",🟣 WWE Network
+https://hls.iptv-th.workers.dev/live/4011/playlist.m3u8
+https://godlivetv.io/madoball/10329/playlist.m3u8
+
+#EXTINF:-1 group-title="😁บันเทิง" tvg-logo="https://www.fileinw.com/postor/20240429213343just_for_laughs_gags.jpg",🪅GAGS
+https://distributionsjustepourrire-justforlaughsgags-1-us.tcl.wurl.tv/playlist.m3u8
+
+#EXTINF:-1 tvg-logo="https://goodiptv.site/images/tv/tCz5uOf1XPW1RLITmCX46urCatF7NbI20250830165328Mono1.jpg" group-title="Top Channel",MonoMax 1
+https://hls.iptv-th.workers.dev/live/3912/playlist.m3u8
+#EXTINF:-1 tvg-logo="https://goodiptv.site/images/tv/2YYftpZ0wnosCHE1EIgZf5ktfrimdGJ20250830165343Mono2.jpg" group-title="Top Channel",MonoMax 2
+https://hls.iptv-th.workers.dev/live/3911/playlist.m3u8
+#EXTINF:-1 tvg-logo="https://goodiptv.site/images/tv/gyuyxpMF6QxUlTTiVwrdAj1BnkJxzZa20240418192615Bein1.jpg" group-title="Top Channel",Bein Sport 1
+https://hls.iptv-th.workers.dev/live/3648/playlist.m3u8
+#EXTINF:-1 tvg-logo="https://goodiptv.site/images/tv/PaIhSj5IgqmG9bpEFTzq91kuqT1QNOx20240418192653Bein3.jpg" group-title="Top Channel",Bein Sport 3
+https://hls.iptv-th.workers.dev/live/3646/playlist.m3u8
+#EXTINF:-1 tvg-logo="https://goodiptv.site/images/tv/LsXNd0YLI36D9158SZzCKEV5Ew41FoNไม่มีชื่อ.png" group-title="Top Channel",LFC TV
+https://hls.iptv-th.workers.dev/live/3922/playlist.m3u8
+#EXTINF:-1 tvg-logo="https://goodiptv.site/images/tv/R23vfMQDFybbNPuaiXVslifns7FvwSL20250419153707MUTV.jpg" group-title="Top Channel",Mu TV
+https://hls.iptv-th.workers.dev/live/3960/playlist.m3u8
+#EXTINF:-1 tvg-logo="https://goodiptv.site/images/tv/1Ervzo24A48KRTrhArja3Oc06IV0oPG20240418191821ch3hd.jpg" group-title="ฟรีทีวี FreeTV",CH 3 HD
+https://hls.iptv-th.workers.dev/live/1057/playlist.m3u8
+#EXTINF:-1 tvg-logo="https://goodiptv.site/images/tv/nZH0LpJZb5OAgfUhp6sVadOvhnZpPh320240418185909ch7hd_(1).jpg" group-title="ฟรีทีวี FreeTV",CH 7 HD
+https://hls.iptv-th.workers.dev/live/1059/playlist.m3u8
+#EXTINF:-1 tvg-logo="https://goodiptv.site/images/tv/hRGNf51OPjUdkTqJUH7F9u7D1ttgBvj20240418185850ch5hd.jpg" group-title="ฟรีทีวี FreeTV",CH 5 HD
+https://hls.iptv-th.workers.dev/live/1058/playlist.m3u8
+#EXTINF:-1 tvg-logo="https://goodiptv.site/images/tv/dg4cPn0lmuRerdrEXo9a4EohjNtaqqD20240418190115True4u.jpg" group-title="ฟรีทีวี FreeTV",True 4 U
+https://hls.iptv-th.workers.dev/live/1230/playlist.m3u8
+#EXTINF:-1 tvg-logo="https://goodiptv.site/images/tv/Xh9Vvxt3VDc2AVveQThvrSZPmsNZa8U20240418191253pptvhd.jpg" group-title="ฟรีทีวี FreeTV",PPTV HD
+https://hls.iptv-th.workers.dev/live/1011/playlist.m3u8
+#EXTINF:-1 tvg-logo="https://goodiptv.site/images/tv/C16pIyeDnV9x2R9V4DzDeES2hMsvXu520240418191809amarintvhd.jpg" group-title="ฟรีทีวี FreeTV",Amarin TV
+https://hls.iptv-th.workers.dev/live/1018/playlist.m3u8
+#EXTINF:-1 tvg-logo="https://goodiptv.site/images/tv/wK0lnULhkhSZq0C1b4Gm77FOO37rux720240418191350onehd.jpg" group-title="ฟรีทีวี FreeTV",ONE HD
+https://hls.iptv-th.workers.dev/live/1228/playlist.m3u8
+#EXTINF:-1 tvg-logo="https://goodiptv.site/images/tv/p1RBlYTtqPSNeXzfkM0EUCV9oXymdNA20240418190128gmmchannel.jpg" group-title="ฟรีทีวี FreeTV",GMM 25
+https://hls.iptv-th.workers.dev/live/1098/playlist.m3u8
+#EXTINF:-1 tvg-logo="https://goodiptv.site/images/tv/KLkKLHsc5TCE9xKr2uhfbKl4E50gTdq20240418191335ch8.jpg" group-title="ฟรีทีวี FreeTV",CH 8
+https://hls.iptv-th.workers.dev/live/1060/playlist.m3u8
+#EXTINF:-1 tvg-logo="https://goodiptv.site/images/tv/dhogVoGwkGXbl41VahO3KQn9X29RnCx20240418190941Workpoint.jpg" group-title="ฟรีทีวี FreeTV",Work Point TV
+https://hls.iptv-th.workers.dev/live/1227/playlist.m3u8
+#EXTINF:-1 tvg-logo="https://goodiptv.site/images/tv/3FtzbFnnW69QNPCYBIukhGeLMNnTWlt63d2e530-5999-11f1-9eae-09fe801bd2a9_webp_original.png" group-title="ฟรีทีวี FreeTV",MonoMax Sport
+https://hls.iptv-th.workers.dev/live/1229/playlist.m3u8
+#EXTINF:-1 tvg-logo="https://goodiptv.site/images/tv/zEllIKsvUq3Rrl9WKbrTfIzanTdcghd20240418191042mcothd.jpg" group-title="ฟรีทีวี FreeTV",MCOT HD
+https://hls.iptv-th.workers.dev/live/1010/playlist.m3u8
+#EXTINF:-1 tvg-logo="https://goodiptv.site/images/tv/B409CUlSj9PWt5j1waqxvv1VLfjFvOL20240418191323nbthd.jpg" group-title="ฟรีทีวี FreeTV",NBT
+https://hls.iptv-th.workers.dev/live/1007/playlist.m3u8
+#EXTINF:-1 tvg-logo="https://goodiptv.site/images/tv/rjck1OvG9oIkeWlc5LDWL0tFxGCb4PS20240418192308Nation1.jpg" group-title="ฟรีทีวี FreeTV",Nation 22 TV
+https://hls.iptv-th.workers.dev/live/1006/playlist.m3u8
+#EXTINF:-1 tvg-logo="https://goodiptv.site/images/tv/RXLAcYA06tQgoZnDsWLY1N4q5jYuA9o20240418191223tpbshd.jpg" group-title="ฟรีทีวี FreeTV",Thai PBS
+https://hls.iptv-th.workers.dev/live/1005/playlist.m3u8
+#EXTINF:-1 tvg-logo="https://goodiptv.site/images/tv/wIvpTVufwuomyCez38RtU10ql6ReqIX20240418191057thairahttvhd.jpg" group-title="ฟรีทีวี FreeTV",Thai Rath HD
+https://hls.iptv-th.workers.dev/live/1004/playlist.m3u8
+#EXTINF:-1 tvg-logo="https://goodiptv.site/images/tv/sC5Vce9wmuN8MOOQ3tCiA2qQfMRPBss20240418191206Topnews.jpg" group-title="ฟรีทีวี FreeTV",Top News
+https://hls.iptv-th.workers.dev/live/1186/playlist.m3u8
+#EXTINF:-1 tvg-logo="https://goodiptv.site/images/tv/z5heqnnm5MOENredeJKfZC2A2tXpGfe20240418193731tsports7.jpg" group-title="ฟรีทีวี FreeTV",T Sport 7
+https://hls.iptv-th.workers.dev/live/2734/playlist.m3u8
+#EXTINF:-1 tvg-logo="https://goodiptv.site/images/tv/WQba0HTE8tPWkD7LQQZHIQyQO47fUW120240418191939tptv.jpg" group-title="ฟรีทีวี FreeTV",โทรทัศน์รัฐสภา
+https://hls.iptv-th.workers.dev/live/1205/playlist.m3u8
+#EXTINF:-1 tvg-logo="https://goodiptv.site/images/tv/jAysDH1WGtTB9nFzNFQnMrTRvl8Met8news1.png" group-title="ฟรีทีวี FreeTV",News1
+https://hls.iptv-th.workers.dev/live/1206/playlist.m3u8
+#EXTINF:-1 tvg-logo="https://goodiptv.site/images/tv/TOzkL9EBJ7RA81DkRsjF1I77dhjEKwR20240418190014TNN16.jpg" group-title="ฟรีทีวี FreeTV",TNN 16
+https://hls.iptv-th.workers.dev/live/1003/playlist.m3u8
+`;
 
 // ==============================================
-// 🎯 ตัวแปร
+// 🎯 ตัวแปรหลัก
 // ==============================================
-const video = document.getElementById('video');
+const videoPlayer = document.getElementById('videoPlayer');
 const statusBar = document.getElementById('statusBar');
-const categoriesDiv = document.getElementById('categories');
-const channelsDiv = document.getElementById('channels');
-const sizeButtons = document.querySelectorAll('.size-btn');
-let hls = null, dashPlayer = null;
+const channelList = document.getElementById('channelList');
+const categoryTab = document.getElementById('categoryTab');
+
+let hls = null;       // ตัวจัดการ HLS
+let dashPlayer = null; // ตัวจัดการ DASH
+let currentCategory = 'all';
+let currentChannelIndex = -1;
 
 // ==============================================
-// 🎛️ เปลี่ยนโหมดขนาดภาพ
+// 📋 แปลงข้อมูล M3U
 // ==============================================
-function setVideoSizeMode(mode) {
-  // ลบคลาสเดิม
-  video.classList.remove('mode-contain','mode-cover','mode-fill','mode-16-9','mode-4-3');
-  sizeButtons.forEach(btn => btn.classList.toggle('active', btn.dataset.mode === mode));
-
-  if (mode === 'full') {
-    // เปิดโหมดเต็มจอ
-    if (video.requestFullscreen) video.requestFullscreen();
-    else if (video.webkitRequestFullscreen) video.webkitRequestFullscreen();
-    return;
+function parseM3U(data) {
+  const lines = data.trim().split('\n');
+  const channels = [];
+  for (let i = 0; i < lines.length; i++) {
+    if (lines[i].startsWith('#EXTINF')) {
+      const infoLine = lines[i];
+      let urlLine = (lines[i+1] || '').trim();
+      
+      // ข้ามบรรทัดข้อมูลพิเศษ เช่น #KODIPROP:...
+      if (urlLine.startsWith('#') && lines[i+2]) {
+        urlLine = (lines[i+2] || '').trim();
+      }
+      
+      const logoMatch = infoLine.match(/tvg-logo="([^"]+)"/);
+      const groupMatch = infoLine.match(/group-title="([^"]+)"/);
+      const nameMatch = infoLine.match(/,\s*(.*)$/);
+      
+      if (urlLine.startsWith('http')) {
+        channels.push({
+          name: nameMatch ? nameMatch[1].trim() : 'ไม่ระบุ',
+          logo: logoMatch ? logoMatch[1] : '',
+          group: groupMatch ? groupMatch[1].trim() : 'อื่นๆ',
+          url: urlLine
+        });
+      }
+    }
   }
-
-  // ตั้งค่าโหมดใหม่
-  video.classList.add(`mode-${mode}`);
-  const labels = { contain:'มีขอบดำ', cover:'เต็มจอไม่มีขอบ', fill:'ขยายเต็มจอ', '16-9':'16:9 มาตรฐาน', '4-3':'4:3 แบบเก่า' };
-  statusBar.textContent = `✅ โหมด: ${labels[mode]}`;
+  return channels;
 }
 
-// ผูกเหตุการณ์ปุ่มปรับขนาด
-sizeButtons.forEach(btn => {
-  btn.addEventListener('click', () => setVideoSizeMode(btn.dataset.mode));
+const channels = parseM3U(m3uData);
+
+// ==============================================
+// 📂 จัดกลุ่มช่องตามหมวดหมู่
+// ==============================================
+const groups = {};
+channels.forEach((ch, idx) => {
+  if (!groups[ch.group]) groups[ch.group] = [];
+  groups[ch.group].push({ ...ch, index: idx });
 });
 
 // ==============================================
-// 🔍 ตรวจสอบประเภทสตรีม
+// 🔘 สร้างปุ่มหมวดหมู่
 // ==============================================
-function getStreamType(url) {
-  const lower = url.toLowerCase();
-  if (lower.includes('.m3u8')) return 'hls';
-  if (lower.includes('.mpd')) return 'dash';
-  return 'unknown';
+Object.keys(groups).forEach(groupName => {
+  const btn = document.createElement('button');
+  btn.className = 'category-btn';
+  btn.dataset.category = groupName;
+  btn.textContent = groupName;
+  btn.onclick = () => switchCategory(groupName);
+  categoryTab.appendChild(btn);
+});
+
+// ==============================================
+// 🔄 เปลี่ยนหมวดหมู่
+// ==============================================
+function switchCategory(catName) {
+  currentCategory = catName;
+  document.querySelectorAll('.category-btn').forEach(b => {
+    b.classList.toggle('active', b.dataset.category === catName);
+  });
+  document.querySelectorAll('.channel-group').forEach(grp => {
+    grp.classList.toggle('hidden', catName !== 'all' && grp.dataset.group !== catName);
+  });
 }
 
 // ==============================================
-// ▶️ เล่นช่อง
+// 📋 แสดงรายการช่อง
 // ==============================================
-function playChannel(channel) {
-  statusBar.textContent = `⏳ กำลังโหลด: ${channel.name}...`;
-  stopVideo();
-  const type = getStreamType(channel.stream);
-  if (type === 'hls') playHLS(channel);
-  else if (type === 'dash') playDASH(channel);
-  else statusBar.textContent = `❌ ไม่รู้จักประเภทสตรีม`;
+Object.entries(groups).forEach(([groupName, items]) => {
+  const groupDiv = document.createElement('div');
+  groupDiv.className = 'channel-group';
+  groupDiv.dataset.group = groupName;
+
+  items.forEach(ch => {
+    const div = document.createElement('div');
+    div.className = 'channel-item';
+    div.setAttribute('tabindex', '0');
+    div.setAttribute('role', 'button');
+    div.setAttribute('aria-label', `ช่อง ${ch.name}`);
+    div.innerHTML = `
+      <img src="${ch.logo}" alt="${ch.name}" onerror="this.src='https://via.placeholder.com/60x36?text='📺">
+      <div class="channel-name">${ch.name}</div>
+    `;
+    div.onclick = () => selectChannel(ch.index, div);
+    groupDiv.appendChild(div);
+  });
+
+  channelList.appendChild(groupDiv);
+});
+
+// ==============================================
+// ▶️ เล่นช่อง — ตรวจสอบประเภทอัตโนมัติ
+// ==============================================
+function selectChannel(index, element) {
+  if (index < 0 || index >= channels.length) return;
+  currentChannelIndex = index;
+  const ch = channels[index];
+  
+  // ไฮไลต์รายการที่เลือก
+  document.querySelectorAll('.channel-item').forEach(el => el.classList.remove('active'));
+  if (element) element.classList.add('active');
+
+  // ปิดตัวเล่นเก่าก่อน
+  cleanupPlayers();
+
+  statusBar.textContent = `⏳ กำลังโหลด: ${ch.name}`;
+
+  // 🔹 ตรวจสอบประเภทไฟล์
+  const url = ch.url;
+
+  if (url.includes('.mpd')) {
+    // ================= DASH =================
+    playDASH(url, ch.name);
+  } 
+  else if (url.includes('.m3u8')) {
+    // ================= HLS =================
+    playHLS(url, ch.name);
+  } 
+  else {
+    // ================= วิดีโอปกติ =================
+    playDirect(url, ch.name);
+  }
 }
 
-function playHLS(channel) {
-  // ลองใช้โหมดเนทีฟก่อน (ข้าม CORS ในบางกรณี)
-  if (video.canPlayType('application/vnd.apple.mpegurl')) {
-    video.src = channel.stream;
-    video.play().catch(() => {});
-    statusBar.textContent = `✅ [HLS-Native] กำลังเล่น: ${channel.name}`;
+// ==============================================
+// 🎯 เล่น DASH (.mpd)
+// ==============================================
+function playDASH(url, name) {
+  if (!window.dashjs) {
+    statusBar.textContent = '❌ เบราว์เซอร์ไม่รองรับ DASH.js';
     return;
   }
-  // ถ้าไม่ได้ ค่อยใช้ hls.js
+
+  dashPlayer = dashjs.MediaPlayer().create();
+  dashPlayer.updateSettings({
+    streaming: {
+      abr: { autoSwitchBitrate: { video: true, audio: true } }
+    }
+  });
+
+  dashPlayer.initialize(videoPlayer, url, true);
+
+  dashPlayer.on(dashjs.MediaPlayer.events.STREAM_INITIALIZED, () => {
+    statusBar.textContent = `✅ [DASH] กำลังเล่น: ${name}`;
+  });
+
+  dashPlayer.on(dashjs.MediaPlayer.events.ERROR, (e) => {
+    statusBar.textContent = `❌ DASH เล่นไม่ได้: ${name}`;
+    console.error('DASH Error:', e);
+  });
+}
+
+// ==============================================
+// 🎯 เล่น HLS (.m3u8)
+// ==============================================
+function playHLS(url, name) {
   if (Hls.isSupported()) {
-    // ... โค้ด hls.js เหมือนเดิม
+    hls = new Hls({
+      maxBufferLength: 30,
+      maxMaxBufferLength: 60,
+      xhrSetup: function(xhr) {
+        try {
+          const urlObj = new URL(url);
+          xhr.setRequestHeader('Referer', urlObj.origin + '/');
+          xhr.setRequestHeader('Origin', urlObj.origin);
+        } catch(e) {}
+      }
+    });
+
+    hls.loadSource(url);
+    hls.attachMedia(videoPlayer);
+
+    hls.on(Hls.Events.MANIFEST_PARSED, () => {
+      statusBar.textContent = `✅ [HLS] กำลังเล่น: ${name}`;
+      videoPlayer.play().catch(() => {
+        statusBar.textContent = `⚠️ คลิกเพื่อเล่น: ${name}`;
+      });
+    });
+
+    hls.on(Hls.Events.ERROR, (event, data) => {
+      if (data.fatal) {
+        statusBar.textContent = `❌ HLS เล่นไม่ได้: ${name}`;
+        console.error('HLS Error:', data);
+      }
+    });
+  }
+  // Safari รองรับ .m3u8 โดยตรง
+  else if (videoPlayer.canPlayType('application/vnd.apple.mpegurl')) {
+    videoPlayer.src = url;
+    videoPlayer.play();
+    statusBar.textContent = `✅ [HLS Safari] กำลังเล่น: ${name}`;
+  }
+  else {
+    statusBar.textContent = '❌ เบราว์เซอร์ไม่รองรับ HLS';
   }
 }
 
-function playDASH(channel) {
-  dashPlayer = dashjs.MediaPlayer().create();
-  dashPlayer.initialize(video, channel.stream, true);
-  dashPlayer.on('streamInitialized', () => statusBar.textContent = `✅ [DASH] กำลังเล่น: ${channel.name}`);
-  dashPlayer.on('error', () => statusBar.textContent = `❌ DASH เล่นไม่ได้: ${channel.name}`);
-}
-
-function stopVideo() {
-  if (hls) { hls.destroy(); hls=null; }
-  if (dashPlayer) { dashPlayer.reset(); dashPlayer=null; }
-  video.removeAttribute('src'); video.load();
-}
-
-
-
 // ==============================================
-// 📂 แสดงหมวดหมู่และช่อง
+// 🎯 เล่นวิดีโอโดยตรง
 // ==============================================
-function renderCategories() {
-  categoriesDiv.innerHTML = channelsDiv.innerHTML = '';
-  categories.forEach(cat => {
-    const btn = Object.assign(document.createElement('div'), { className:'channel-button', innerHTML:`${cat.name} (${cat.channels.length})` });
-    btn.onclick = () => renderChannels(cat);
-    categoriesDiv.appendChild(btn);
+function playDirect(url, name) {
+  videoPlayer.src = url;
+  videoPlayer.play().then(() => {
+    statusBar.textContent = `✅ กำลังเล่น: ${name}`;
+  }).catch(() => {
+    statusBar.textContent = `⚠️ คลิกเพื่อเล่น: ${name}`;
   });
 }
 
-function renderChannels(category) {
-  categoriesDiv.innerHTML = channelsDiv.innerHTML = '';
-  category.channels.forEach((ch,i) => {
-    const btn = document.createElement('div');
-    btn.className = 'channel-button';
-    btn.innerHTML = `<img src="${ch.logo}" alt="${ch.name}" loading="lazy" onerror="this.src='https://via.placeholder.com/42?text=📺'"><div style="font-size:12px">${i+1}. ${ch.name}</div>`;
-    btn.onclick = () => playChannel(ch);
-    channelsDiv.appendChild(btn);
-  });
-  const backBtn = Object.assign(document.createElement('div'), { className:'channel-button back-btn', innerHTML:'🔙 ย้อนกลับ' });
-  backBtn.onclick = renderCategories;
-  channelsDiv.appendChild(backBtn);
+// ==============================================
+// 🧹 ทำความสะอาดตัวเล่นเก่า
+// ==============================================
+function cleanupPlayers() {
+  if (hls) { hls.destroy(); hls = null; }
+  if (dashPlayer) { dashPlayer.destroy(); dashPlayer = null; }
+  videoPlayer.removeAttribute('src');
+  videoPlayer.load();
 }
 
-renderCategories();
+// ==============================================
+// 🔘 ปุ่มควบคุม
+// ==============================================
+document.getElementById('loadVideoBtn').addEventListener('click', () => {
+  const url = document.getElementById('videoInput').value.trim();
+  if (!url) return alert('กรุณากรอก URL ก่อนครับ');
+  
+  // สร้างช่องชั่วคราวเพื่อใช้ฟังก์ชันเล่น
+  const tempCh = { url: url, name: 'ลิงก์ที่ระบุ' };
+  const tempIndex = channels.length;
+  channels.push(tempCh);
+  selectChannel(tempIndex, null);
+});
+
+document.getElementById('stretch').onclick = () => videoPlayer.style.objectFit = 'fill';
+document.getElementById('crop').onclick = () => videoPlayer.style.objectFit = 'cover';
+document.getElementById('zoom').onclick = () => {
+  videoPlayer.style.objectFit = (videoPlayer.style.objectFit === 'none') ? 'contain' : 'none';
+};
+document.getElementById('fullscreen').onclick = () => {
+  if (videoPlayer.requestFullscreen) videoPlayer.requestFullscreen();
+  else if (videoPlayer.webkitRequestFullscreen) videoPlayer.webkitRequestFullscreen();
+};
+</script>
+
+<!-- Firebase (คงไว้เหมือนเดิม) -->
+<script type="module">
+  import { initializeApp } from "https://www.gstatic.com/firebasejs/12.17.1/firebase-app.js";
+  import { getAnalytics } from "https://www.gstatic.com/firebasejs/12.17.1/firebase-analytics.js";
+  const firebaseConfig = {
+    apiKey: "AIzaSyBqqeH0K8sqQZu54A-ZLtfD_DFiNTqbKTc",
+    authDomain: "tvplayer-wepplay.firebaseapp.com",
+    projectId: "tvplayer-wepplay",
+    storageBucket: "tvplayer-wepplay.firebasestorage.app",
+    messagingSenderId: "80931188734",
+    appId: "1:80931188734:web:3e1a7ae2b356f36e985aaf",
+    measurementId: "G-XQRXZ5CZR5"
+  };
+  const app = initializeApp(firebaseConfig);
+  const analytics = getAnalytics(app);
 </script>
 </body>
 </html>
